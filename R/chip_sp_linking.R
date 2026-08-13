@@ -87,17 +87,25 @@ chipSPLink <- function(
   # 1. Validate inputs
   # ----------------------------------------------------------
 
-  if (
-    !is.character(chip_file) ||
-      length(chip_file) != 1L ||
-      is.na(chip_file) ||
-      chip_file == ""
-  ) {
-    stop("`chip_file` must be one valid file path.")
-  }
+  if (!is.null(chip_file)) {
 
-  if (!file.exists(chip_file)) {
-    stop("ChIP file not found: ", chip_file)
+    if (
+      !is.character(chip_file) ||
+        length(chip_file) != 1L ||
+        is.na(chip_file) ||
+        chip_file == ""
+    ) {
+      stop(
+        "`chip_file` must be NULL or one valid file path."
+      )
+    }
+
+    if (!file.exists(chip_file)) {
+      stop(
+        "ChIP file not found: ",
+        chip_file
+      )
+    }
   }
 
   if (!is.data.frame(hic_df)) {
