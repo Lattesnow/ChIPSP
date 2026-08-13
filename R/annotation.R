@@ -161,46 +161,81 @@ ChIPSPannotation <- function(
   # 4. Check required packages
   # ==========================================================
 
+  # ==========================================================
+# 4. Check required packages
+# ==========================================================
+
+if (species == "human" && ref_genome == "hg19") {
+
   required_packages <- c(
     "ChIPpeakAnno",
     "GenomicRanges",
     "IRanges",
+    "S4Vectors",
     "AnnotationDbi",
     "org.Hs.eg.db",
-    "org.Mm.eg.db",
-    "TxDb.Hsapiens.UCSC.hg19.knownGene",
-    "TxDb.Hsapiens.UCSC.hg38.knownGene",
-    "TxDb.Mmusculus.UCSC.mm9.knownGene",
-    "TxDb.Mmusculus.UCSC.mm10.knownGene"
+    "TxDb.Hsapiens.UCSC.hg19.knownGene"
   )
 
-  missing_packages <- required_packages[
-    !vapply(
-      required_packages,
-      requireNamespace,
-      quietly = TRUE,
-      FUN.VALUE = logical(1)
-    )
-  ]
+} else if (species == "human" && ref_genome == "hg38") {
 
-  if (length(missing_packages) > 0L) {
-    stop(
-      "Required package(s) not installed: ",
-      paste(
-        missing_packages,
-        collapse = ", "
-      )
-    )
-  }
+  required_packages <- c(
+    "ChIPpeakAnno",
+    "GenomicRanges",
+    "IRanges",
+    "S4Vectors",
+    "AnnotationDbi",
+    "org.Hs.eg.db",
+    "TxDb.Hsapiens.UCSC.hg38.knownGene"
+  )
 
+} else if (species == "mouse" && ref_genome == "mm9") {
+
+  required_packages <- c(
+    "ChIPpeakAnno",
+    "GenomicRanges",
+    "IRanges",
+    "S4Vectors",
+    "AnnotationDbi",
+    "org.Mm.eg.db",
+    "TxDb.Mmusculus.UCSC.mm9.knownGene"
+  )
+
+} else if (species == "mouse" && ref_genome == "mm10") {
+
+  required_packages <- c(
+    "ChIPpeakAnno",
+    "GenomicRanges",
+    "IRanges",
+    "S4Vectors",
+    "AnnotationDbi",
+    "org.Mm.eg.db",
+    "TxDb.Mmusculus.UCSC.mm10.knownGene"
+  )
+}
+
+missing_packages <- required_packages[
+  !vapply(
+    required_packages,
+    requireNamespace,
+    quietly = TRUE,
+    FUN.VALUE = logical(1)
+  )
+]
+
+if (length(missing_packages) > 0L) {
+  stop(
+    "Required package(s) not installed: ",
+    paste(
+      missing_packages,
+      collapse = ", "
+    )
+  )
+}
 
   # ==========================================================
   # 5. Select genome annotation database
   # ==========================================================
-
-# ==========================================================
-# 5. Select genome annotation database
-# ==========================================================
 
 if (species == "human") {
 
