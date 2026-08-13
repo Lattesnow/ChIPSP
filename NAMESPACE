@@ -3,3 +3,4 @@
 export(chipSPLink)
 export(mergeHiCLoops)
 export(removeXYChromosomes)
+export(readChIPFile)
