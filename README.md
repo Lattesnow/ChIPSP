@@ -19,8 +19,9 @@ Spatial interactions are ranked using both **ChIP-seq peak strength** (`pileup`)
 Install the development version from GitHub with:
 
 ```r
-# install.packages("devtools")
-devtools::install_github("Lattesnow/ChIP_SP")
+install.packages("remotes")
+
+remotes::install_github("Lattesnow/ChIP_SP")
 ```
 
 Then load the package with:
