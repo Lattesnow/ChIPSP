@@ -76,8 +76,9 @@
 #'
 #' @export
 chipSPLink <- function(
-    chip_file,
+    chip_file = NULL,
     hic_df,
+    chip_path = getwd(),
     fdr_cutoff = 0.05,
     overlap_mode = "any",
     add_chr_prefix = TRUE) {
