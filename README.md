@@ -1,4 +1,4 @@
-# ChIP_SP: Spatial ChIP (ChIPSP) as a New Bioinformatics Tool to Characterize Spatial Gene Regulation
+# ChIPSP: Spatial ChIP (ChIPSP) as a New Bioinformatics Tool to Characterize Spatial Gene Regulation
 
 ## Overview
 
