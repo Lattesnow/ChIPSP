@@ -1,45 +1,62 @@
 #' Run Enrichr Analysis for ChIP and ChIP-SP Gene Sets
 #'
 #' @description
-#' Performs Enrichr analysis for genes annotated from conventional ChIP-seq
-#' and ChIP-SP results. The function generates ChIP, ChIP-SP, ChIP-SP-only,
-#' ChIP-only, and shared gene sets, runs enrichment analysis, saves enrichment
-#' tables, and creates manuscript-style dot plots.
+#' Performs Enrichr pathway enrichment analysis for genes annotated from
+#' conventional ChIP-seq and ChIP-SP results.
 #'
-#' Pathways are ranked by nominal P value. Dot color represents
-#' -log10(P value), dot size represents overlapping gene count, and the
-#' x-axis represents gene ratio (overlapping genes / total pathway genes).
+#' Five gene sets are generated:
+#' \itemize{
+#'   \item ChIP
+#'   \item ChIPSP
+#'   \item ChIPSP_only
+#'   \item ChIP_only
+#'   \item Shared
+#' }
+#'
+#' Enrichr result tables are written for every selected database.
+#' Dotplots are generated for ChIP, ChIPSP, ChIPSP_only, and Shared genes.
+#'
+#' Pathways are ranked by nominal P value.
+#' Dot color represents -log10(P value).
+#' Dot size represents the number of overlapping genes.
+#' The x-axis represents the gene ratio:
+#' overlapping genes / total genes in the pathway.
 #'
 #' @param chip_file Character scalar. CSV file containing annotated
 #'   conventional ChIP-seq genes. Default is
 #'   \code{"ChIP_anno_genes_upAdown_UCSC_Control.csv"}.
+#'
 #' @param chipsp_file Character scalar. CSV file containing annotated
 #'   ChIP-SP genes. Default is
 #'   \code{"ChIP_anno_genes_upAdown_UCSC_CHIPSP.csv"}.
-#' @param out_dir Character scalar. Output directory. Default is
-#'   \code{"Enrichr_dotplots"}.
-#' @param symbol_col Character scalar. Gene-symbol column in the input files.
-#'   Default is \code{"symbol"}.
-#' @param databases Character vector of Enrichr database names.
-#' @param top_n_summary Integer. Maximum number of terms retained per database
-#'   in the combined result table. Default is 50.
-#' @param top_n_plot Integer. Maximum number of pathways shown per dot plot.
-#'   Default is 10.
-#' @param p_cutoff Numeric scalar. Nominal P-value cutoff used for plotting.
-#'   Default is 0.05.
-#' @param groups_to_plot Character vector specifying groups for which plots
-#'   are generated. Default is ChIP, ChIPSP, ChIPSP_only, and Shared.
-#' @param uppercase_genes Logical. If TRUE, gene symbols are converted to
-#'   uppercase before Enrichr analysis, matching the original workflow.
-#'   Default is TRUE.
-#' @param seed Integer random seed. Default is 1234.
 #'
-#' @return Invisibly returns a list containing gene sets, the gene summary,
-#'   individual Enrichr results, the combined enrichment table, and plots.
+#' @param out_dir Character scalar. Output directory.
+#'   Default is \code{"Enrichr_dotplots"}.
+#'
+#' @param databases Character vector containing Enrichr database names.
+#'
+#' @param symbol_col Character scalar specifying the gene-symbol column.
+#'   Default is \code{"symbol"}.
+#'
+#' @param top_n Integer specifying the number of pathways shown in each
+#'   dotplot. Default is \code{10}.
+#'
+#' @param enrichment_top_n Integer specifying the number of pathways retained
+#'   from each Enrichr database when generating the combined result table.
+#'   Default is \code{50}.
+#'
+#' @param p_cutoff Numeric scalar specifying the nominal P-value cutoff for
+#'   dotplots. Default is \code{0.05}.
+#'
+#' @param uppercase_genes Logical. If TRUE, gene symbols are converted to
+#'   uppercase before Enrichr analysis. Default is TRUE.
+#'
+#' @return Invisibly returns a list containing gene sets, gene summary,
+#'   Enrichr results, combined enrichment results, and generated plots.
 #'
 #' @examples
 #' \dontrun{
-#' enrich_results <- ChIPSPenrichment()
+#' enrichment_results <- ChIPSPenrichment()
 #' }
 #'
 #' @export
@@ -47,7 +64,6 @@ ChIPSPenrichment <- function(
     chip_file = "ChIP_anno_genes_upAdown_UCSC_Control.csv",
     chipsp_file = "ChIP_anno_genes_upAdown_UCSC_CHIPSP.csv",
     out_dir = "Enrichr_dotplots",
-    symbol_col = "symbol",
     databases = c(
       "GO_Biological_Process_2023",
       "GO_Cellular_Component_2023",
@@ -57,83 +73,21 @@ ChIPSPenrichment <- function(
       "ChEA_2022",
       "MSigDB_Hallmark_2020"
     ),
-    top_n_summary = 50L,
-    top_n_plot = 10L,
+    symbol_col = "symbol",
+    top_n = 10,
+    enrichment_top_n = 50,
     p_cutoff = 0.05,
-    groups_to_plot = c(
-      "ChIP",
-      "ChIPSP",
-      "ChIPSP_only",
-      "Shared"
-    ),
-    uppercase_genes = TRUE,
-    seed = 1234L
+    uppercase_genes = TRUE
 ) {
 
   # ==========================================================
-  # 1. Validate inputs
-  # ==========================================================
-
-  if (!is.character(chip_file) || length(chip_file) != 1L ||
-      is.na(chip_file) || chip_file == "") {
-    stop("`chip_file` must be one valid file path.")
-  }
-
-  if (!file.exists(chip_file)) {
-    stop("ChIP annotation file not found: ", chip_file)
-  }
-
-  if (!is.character(chipsp_file) || length(chipsp_file) != 1L ||
-      is.na(chipsp_file) || chipsp_file == "") {
-    stop("`chipsp_file` must be one valid file path.")
-  }
-
-  if (!file.exists(chipsp_file)) {
-    stop("ChIP-SP annotation file not found: ", chipsp_file)
-  }
-
-  if (!is.character(out_dir) || length(out_dir) != 1L ||
-      is.na(out_dir) || out_dir == "") {
-    stop("`out_dir` must be one valid directory path.")
-  }
-
-  if (!is.character(symbol_col) || length(symbol_col) != 1L ||
-      is.na(symbol_col) || symbol_col == "") {
-    stop("`symbol_col` must be one valid column name.")
-  }
-
-  if (!is.character(databases) || length(databases) == 0L) {
-    stop("`databases` must contain at least one Enrichr database name.")
-  }
-
-  if (!is.numeric(top_n_summary) || length(top_n_summary) != 1L ||
-      is.na(top_n_summary) || top_n_summary < 1) {
-    stop("`top_n_summary` must be one positive integer.")
-  }
-
-  if (!is.numeric(top_n_plot) || length(top_n_plot) != 1L ||
-      is.na(top_n_plot) || top_n_plot < 1) {
-    stop("`top_n_plot` must be one positive integer.")
-  }
-
-  if (!is.numeric(p_cutoff) || length(p_cutoff) != 1L ||
-      is.na(p_cutoff) || !is.finite(p_cutoff) ||
-      p_cutoff <= 0 || p_cutoff > 1) {
-    stop("`p_cutoff` must be greater than 0 and less than or equal to 1.")
-  }
-
-  if (!is.logical(uppercase_genes) || length(uppercase_genes) != 1L ||
-      is.na(uppercase_genes)) {
-    stop("`uppercase_genes` must be TRUE or FALSE.")
-  }
-
-  # ==========================================================
-  # 2. Check required packages
+  # 1. Check required packages
   # ==========================================================
 
   required_packages <- c(
     "enrichR",
     "ggplot2",
+    "stringr",
     "scales"
   )
 
@@ -149,15 +103,152 @@ ChIPSPenrichment <- function(
   if (length(missing_packages) > 0L) {
     stop(
       "Required package(s) not installed: ",
-      paste(missing_packages, collapse = ", ")
+      paste(
+        missing_packages,
+        collapse = ", "
+      )
     )
   }
 
+
   # ==========================================================
-  # 3. Initialize output and Enrichr
+  # 2. Validate input files
   # ==========================================================
 
-  set.seed(seed)
+  if (
+    !is.character(chip_file) ||
+      length(chip_file) != 1L ||
+      is.na(chip_file) ||
+      chip_file == ""
+  ) {
+    stop(
+      "`chip_file` must be one valid file path."
+    )
+  }
+
+  if (!file.exists(chip_file)) {
+    stop(
+      "ChIP annotation file not found: ",
+      chip_file
+    )
+  }
+
+
+  if (
+    !is.character(chipsp_file) ||
+      length(chipsp_file) != 1L ||
+      is.na(chipsp_file) ||
+      chipsp_file == ""
+  ) {
+    stop(
+      "`chipsp_file` must be one valid file path."
+    )
+  }
+
+  if (!file.exists(chipsp_file)) {
+    stop(
+      "ChIP-SP annotation file not found: ",
+      chipsp_file
+    )
+  }
+
+
+  # ==========================================================
+  # 3. Validate arguments
+  # ==========================================================
+
+  if (
+    !is.character(out_dir) ||
+      length(out_dir) != 1L ||
+      is.na(out_dir) ||
+      out_dir == ""
+  ) {
+    stop(
+      "`out_dir` must be one valid directory path."
+    )
+  }
+
+
+  if (
+    !is.character(databases) ||
+      length(databases) == 0L
+  ) {
+    stop(
+      "`databases` must contain at least one Enrichr database."
+    )
+  }
+
+
+  if (
+    !is.character(symbol_col) ||
+      length(symbol_col) != 1L ||
+      is.na(symbol_col) ||
+      symbol_col == ""
+  ) {
+    stop(
+      "`symbol_col` must be one valid column name."
+    )
+  }
+
+
+  if (
+    !is.numeric(top_n) ||
+      length(top_n) != 1L ||
+      is.na(top_n) ||
+      top_n < 1
+  ) {
+    stop(
+      "`top_n` must be a positive integer."
+    )
+  }
+
+  top_n <- as.integer(top_n)
+
+
+  if (
+    !is.numeric(enrichment_top_n) ||
+      length(enrichment_top_n) != 1L ||
+      is.na(enrichment_top_n) ||
+      enrichment_top_n < 1
+  ) {
+    stop(
+      "`enrichment_top_n` must be a positive integer."
+    )
+  }
+
+  enrichment_top_n <- as.integer(
+    enrichment_top_n
+  )
+
+
+  if (
+    !is.numeric(p_cutoff) ||
+      length(p_cutoff) != 1L ||
+      is.na(p_cutoff) ||
+      !is.finite(p_cutoff) ||
+      p_cutoff <= 0 ||
+      p_cutoff > 1
+  ) {
+    stop(
+      "`p_cutoff` must be greater than 0 and less than or equal to 1."
+    )
+  }
+
+
+  if (
+    !is.logical(uppercase_genes) ||
+      length(uppercase_genes) != 1L ||
+      is.na(uppercase_genes)
+  ) {
+    stop(
+      "`uppercase_genes` must be TRUE or FALSE."
+    )
+  }
+
+
+  # ==========================================================
+  # 4. Create output directory
+  # ==========================================================
 
   dir.create(
     out_dir,
@@ -165,13 +256,77 @@ ChIPSPenrichment <- function(
     recursive = TRUE
   )
 
-  enrichR::setEnrichrSite("Enrichr")
 
   # ==========================================================
-  # 4. Internal helper: read gene list
+  # 5. Initialize Enrichr
+  #
+  # Important:
+  # enrichR::setEnrichrSite() can fail when enrichR is used
+  # through :: without first attaching the package because
+  # enrichR.sites.base.address may not have been initialized.
+  #
+  # Set the required Enrichr options directly.
   # ==========================================================
 
-  get_gene_list <- function(file) {
+  options(
+    enrichR.sites.base.address =
+      "https://maayanlab.cloud/"
+  )
+
+  options(
+    enrichR.base.address =
+      "https://maayanlab.cloud/Enrichr/"
+  )
+
+  options(
+    speedrichr.base.address =
+      "https://maayanlab.cloud/speedrichr/api/"
+  )
+
+  options(
+    enrichR.live = TRUE
+  )
+
+  options(
+    enrichR.quiet = FALSE
+  )
+
+  options(
+    enrichR.sites = c(
+      "Enrichr",
+      "FlyEnrichr",
+      "WormEnrichr",
+      "YeastEnrichr",
+      "FishEnrichr",
+      "OxEnrichr"
+    )
+  )
+
+
+  message(
+    "Enrichr server: ",
+    getOption("enrichR.base.address")
+  )
+
+
+  # ==========================================================
+  # 6. Reproducibility
+  # ==========================================================
+
+  set.seed(
+    1234
+  )
+
+
+  # ==========================================================
+  # 7. Internal function:
+  # Read gene list
+  # ==========================================================
+
+  get_gene_list <- function(
+      file,
+      symbol_column
+  ) {
 
     tab <- utils::read.csv(
       file,
@@ -179,42 +334,84 @@ ChIPSPenrichment <- function(
       check.names = FALSE
     )
 
-    if (!symbol_col %in% colnames(tab)) {
+
+    if (!symbol_column %in% colnames(tab)) {
       stop(
         "Column `",
-        symbol_col,
-        "` was not found in: ",
-        basename(file)
+        symbol_column,
+        "` was not found in ",
+        basename(file),
+        "."
       )
     }
 
+
     genes <- unique(
-      as.character(tab[[symbol_col]])
+      as.character(
+        tab[[symbol_column]]
+      )
     )
 
-    genes <- trimws(genes)
-    genes <- genes[!is.na(genes) & genes != ""]
+
+    genes <- trimws(
+      genes
+    )
+
+
+    genes <- genes[
+      !is.na(genes) &
+        genes != ""
+    ]
+
 
     if (uppercase_genes) {
-      genes <- toupper(genes)
+      genes <- toupper(
+        genes
+      )
     }
 
-    unique(genes)
+
+    genes <- unique(
+      genes
+    )
+
+
+    return(
+      genes
+    )
   }
 
+
   # ==========================================================
-  # 5. Internal helper: run Enrichr and save tables
+  # 8. Internal function:
+  # Run Enrichr and save result tables
   # ==========================================================
 
-  run_enrichr_save <- function(gene_list, group_name) {
+  run_enrichr_save <- function(
+      gene_list,
+      group_name
+  ) {
 
-    message("Running Enrichr for: ", group_name)
-    message("Input genes: ", length(gene_list))
+    message(
+      "--------------------------------------------------"
+    )
+
+    message(
+      "Running Enrichr for: ",
+      group_name
+    )
+
+    message(
+      "Input genes: ",
+      length(gene_list)
+    )
+
 
     group_dir <- file.path(
       out_dir,
       group_name
     )
+
 
     dir.create(
       group_dir,
@@ -222,239 +419,333 @@ ChIPSPenrichment <- function(
       recursive = TRUE
     )
 
+
     if (length(gene_list) < 5L) {
+
       warning(
         group_name,
-        " has fewer than 5 genes. Skipping."
+        " has fewer than 5 genes. Skipping Enrichr analysis."
       )
-      return(NULL)
+
+      return(
+        NULL
+      )
     }
 
-    enr <- tryCatch(
-      enrichR::enrichr(
-        gene_list,
-        databases
-      ),
-      error = function(e) {
-        warning(
-          "Enrichr failed for ",
-          group_name,
-          ": ",
-          conditionMessage(e)
-        )
-        return(NULL)
-      }
+
+    enr <- enrichR::enrichr(
+      gene_list,
+      databases
     )
 
-    if (is.null(enr)) {
-      return(NULL)
+
+    if (
+      is.null(enr) ||
+        length(enr) == 0L
+    ) {
+
+      warning(
+        "No Enrichr results returned for ",
+        group_name,
+        "."
+      )
+
+      return(
+        NULL
+      )
     }
+
 
     for (db in names(enr)) {
 
+      result_file <- file.path(
+        group_dir,
+        paste0(
+          db,
+          "_",
+          group_name,
+          ".csv"
+        )
+      )
+
+
       utils::write.csv(
         enr[[db]],
-        file = file.path(
-          group_dir,
-          paste0(
-            db,
-            "_",
-            group_name,
-            ".csv"
-          )
-        ),
-        row.names = FALSE,
-        quote = FALSE
+        file = result_file,
+        row.names = FALSE
       )
     }
 
-    enr
+
+    return(
+      enr
+    )
   }
 
+
   # ==========================================================
-  # 6. Internal helper: extract top terms
+  # 9. Internal function:
+  # Extract top Enrichr pathways
   # ==========================================================
 
-  extract_top_terms <- function(enr_list, group_name) {
+  extract_top_terms <- function(
+      enr_list,
+      group_name,
+      keep_n
+  ) {
 
     if (is.null(enr_list)) {
-      return(NULL)
+      return(
+        NULL
+      )
     }
 
-    result_list <- lapply(
-      names(enr_list),
-      function(db) {
 
-        tab <- as.data.frame(
-          enr_list[[db]],
-          stringsAsFactors = FALSE
-        )
+    result_list <- list()
 
-        required_columns <- c(
-          "Term",
-          "P.value",
-          "Overlap"
-        )
 
-        missing_columns <- setdiff(
-          required_columns,
-          colnames(tab)
-        )
+    for (db in names(enr_list)) {
 
-        if (length(missing_columns) > 0L) {
-          warning(
-            "Skipping database ",
-            db,
-            " for ",
-            group_name,
-            " because required columns are missing: ",
-            paste(missing_columns, collapse = ", ")
-          )
-          return(NULL)
-        }
+      tab <- as.data.frame(
+        enr_list[[db]],
+        stringsAsFactors = FALSE
+      )
 
-        tab$Database <- db
-        tab$Group <- group_name
-        tab$Term_clean <- as.character(tab$Term)
 
-        tab$neg_log10_p <- -log10(
-          suppressWarnings(
-            as.numeric(tab$P.value)
-          )
-        )
+      if (nrow(tab) == 0L) {
+        next
+      }
 
-        if ("Adjusted.P.value" %in% colnames(tab)) {
-          tab$neg_log10_adjP <- -log10(
-            suppressWarnings(
-              as.numeric(tab$Adjusted.P.value)
-            )
-          )
-        } else {
-          tab$neg_log10_adjP <- NA_real_
-        }
 
-        overlap_text <- as.character(
-          tab$Overlap
-        )
+      required_columns <- c(
+        "Term",
+        "P.value",
+        "Adjusted.P.value",
+        "Overlap"
+      )
 
-        tab$overlap_hit <- suppressWarnings(
-          as.numeric(
-            sub("/.*", "", overlap_text)
+
+      missing_columns <- setdiff(
+        required_columns,
+        colnames(tab)
+      )
+
+
+      if (length(missing_columns) > 0L) {
+
+        warning(
+          "Skipping database ",
+          db,
+          " because required column(s) are missing: ",
+          paste(
+            missing_columns,
+            collapse = ", "
           )
         )
 
-        tab$overlap_total <- suppressWarnings(
-          as.numeric(
-            sub(".*/", "", overlap_text)
+        next
+      }
+
+
+      tab$Database <- db
+      tab$Group <- group_name
+      tab$Term_clean <- as.character(
+        tab$Term
+      )
+
+
+      tab$P.value <- suppressWarnings(
+        as.numeric(
+          tab$P.value
+        )
+      )
+
+
+      tab$Adjusted.P.value <- suppressWarnings(
+        as.numeric(
+          tab$Adjusted.P.value
+        )
+      )
+
+
+      tab$neg_log10_p <- -log10(
+        tab$P.value
+      )
+
+
+      tab$neg_log10_adjP <- -log10(
+        tab$Adjusted.P.value
+      )
+
+
+      tab$overlap_hit <- suppressWarnings(
+        as.numeric(
+          sub(
+            "/.*",
+            "",
+            tab$Overlap
           )
         )
+      )
 
-        tab$GeneRatio <- tab$overlap_hit /
+
+      tab$overlap_total <- suppressWarnings(
+        as.numeric(
+          sub(
+            ".*/",
+            "",
+            tab$Overlap
+          )
+        )
+      )
+
+
+      tab$GeneRatio <- (
+        tab$overlap_hit /
           tab$overlap_total
+      )
+
+
+      tab <- tab[
+        !is.na(tab$P.value),
+        ,
+        drop = FALSE
+      ]
+
+
+      if (nrow(tab) == 0L) {
+        next
+      }
+
+
+      tab <- tab[
+        order(
+          tab$P.value,
+          decreasing = FALSE,
+          na.last = TRUE
+        ),
+        ,
+        drop = FALSE
+      ]
+
+
+      if (nrow(tab) > keep_n) {
 
         tab <- tab[
-          order(
-            suppressWarnings(
-              as.numeric(tab$P.value)
-            ),
-            na.last = NA
+          seq_len(
+            keep_n
           ),
           ,
           drop = FALSE
         ]
-
-        if (nrow(tab) > top_n_summary) {
-          tab <- tab[
-            seq_len(top_n_summary),
-            ,
-            drop = FALSE
-          ]
-        }
-
-        tab
       }
-    )
 
-    result_list <- Filter(
-      Negate(is.null),
-      result_list
-    )
+
+      result_list[[db]] <- tab
+    }
+
 
     if (length(result_list) == 0L) {
-      return(NULL)
+      return(
+        NULL
+      )
     }
+
 
     out <- do.call(
       rbind,
       result_list
     )
 
+
     rownames(out) <- NULL
-    out
+
+
+    return(
+      out
+    )
   }
 
+
   # ==========================================================
-  # 7. Internal helper: figure theme
+  # 10. Internal function:
+  # Nature-style theme
   # ==========================================================
 
-  theme_nature_dot <- function(base_size = 8) {
+  theme_nature_dot <- function(
+      base_size = 8
+  ) {
 
     ggplot2::theme_classic(
       base_size = base_size,
       base_family = "Arial"
     ) +
+
       ggplot2::theme(
+
         text = ggplot2::element_text(
           family = "Arial",
           color = "black"
         ),
+
         plot.title = ggplot2::element_text(
           family = "Arial",
           size = 10,
           face = "bold",
           hjust = 0
         ),
+
         axis.title = ggplot2::element_text(
           family = "Arial",
           size = 9
         ),
+
         axis.text = ggplot2::element_text(
           family = "Arial",
           size = 8,
           color = "black"
         ),
+
         axis.text.x = ggplot2::element_text(
           family = "Arial",
           size = 8,
           angle = 45,
           hjust = 1
         ),
+
         axis.text.y = ggplot2::element_text(
           family = "Arial",
           size = 10,
           color = "black"
         ),
+
         axis.line = ggplot2::element_line(
           linewidth = 0.5,
           color = "black"
         ),
+
         axis.ticks = ggplot2::element_line(
           linewidth = 0.5,
           color = "black"
         ),
+
         panel.grid.major = ggplot2::element_line(
           linewidth = 0.25,
           color = "grey88"
         ),
+
         panel.grid.minor = ggplot2::element_blank(),
+
         legend.title = ggplot2::element_text(
           family = "Arial",
           size = 8
         ),
+
         legend.text = ggplot2::element_text(
           family = "Arial",
           size = 7
         ),
+
         plot.margin = ggplot2::margin(
           5,
           8,
@@ -464,38 +755,58 @@ ChIPSPenrichment <- function(
       )
   }
 
+
   # ==========================================================
-  # 8. Internal helper: plot Enrichr dot plot
+  # 11. Internal function:
+  # Enrichr dotplot
+  #
+  # Ranking:
+  # P value, smallest first
+  #
+  # Dot color:
+  # -log10(P value)
+  #
+  # Dot size:
+  # overlapping gene count
+  #
+  # X-axis:
+  # overlap_hit / overlap_total
   # ==========================================================
 
   plot_enrichr_dotplot <- function(
-      summary_all,
+      summary_table,
       group_name,
       database_name
   ) {
 
-    if (is.null(summary_all) || nrow(summary_all) == 0L) {
-      return(NULL)
+    if (
+      is.null(summary_table) ||
+        nrow(summary_table) == 0L
+    ) {
+
+      return(
+        NULL
+      )
     }
 
-    p_values <- suppressWarnings(
-      as.numeric(summary_all$P.value)
-    )
 
     keep <- (
-      summary_all$Group == group_name &
-        summary_all$Database == database_name &
-        !is.na(p_values) &
-        p_values < p_cutoff
+      summary_table$Group == group_name &
+        summary_table$Database == database_name &
+        !is.na(summary_table$P.value) &
+        summary_table$P.value < p_cutoff
     )
 
-    df <- summary_all[
+
+    df <- summary_table[
       keep,
       ,
       drop = FALSE
     ]
 
+
     if (nrow(df) == 0L) {
+
       message(
         "No nominal P < ",
         p_cutoff,
@@ -504,120 +815,183 @@ ChIPSPenrichment <- function(
         " - ",
         database_name
       )
-      return(NULL)
+
+      return(
+        NULL
+      )
     }
 
-    df$P.value <- suppressWarnings(
-      as.numeric(df$P.value)
-    )
+
+    # --------------------------------------------------------
+    # Rank pathways by P value
+    # --------------------------------------------------------
 
     df <- df[
       order(
         df$P.value,
-        na.last = NA
+        decreasing = FALSE
       ),
       ,
       drop = FALSE
     ]
 
-    if (nrow(df) > top_n_plot) {
+
+    if (nrow(df) > top_n) {
+
       df <- df[
-        seq_len(top_n_plot),
+        seq_len(
+          top_n
+        ),
         ,
         drop = FALSE
       ]
     }
 
-    term_clean <- as.character(
+
+    # --------------------------------------------------------
+    # Clean pathway names
+    # --------------------------------------------------------
+
+    df$Term_clean <- stringr::str_replace(
+      df$Term_clean,
+      "Homo sapiens",
+      ""
+    )
+
+
+    df$Term_clean <- stringr::str_replace_all(
+      df$Term_clean,
+      "_",
+      " "
+    )
+
+
+    df$Term_clean <- stringr::str_replace_all(
+      df$Term_clean,
+      "\\s+",
+      " "
+    )
+
+
+    df$Term_clean <- stringr::str_replace(
+      df$Term_clean,
+      "\\s*R-HSA-[0-9]+",
+      ""
+    )
+
+
+    df$Term_clean <- stringr::str_trim(
       df$Term_clean
     )
 
-    term_clean <- gsub(
-      "Homo sapiens",
-      "",
-      term_clean,
-      fixed = TRUE
-    )
 
-    term_clean <- gsub(
-      "_",
-      " ",
-      term_clean,
-      fixed = TRUE
-    )
-
-    term_clean <- gsub(
-      "\\s+",
-      " ",
-      term_clean
-    )
-
-    term_clean <- gsub(
-      "\\s*R-HSA-[0-9]+",
-      "",
-      term_clean
-    )
-
-    term_clean <- trimws(
-      term_clean
-    )
-
-    term_clean <- ifelse(
-      nchar(term_clean) > 58,
-      paste0(
-        substr(term_clean, 1, 55),
-        "..."
-      ),
-      term_clean
-    )
-
-    df$Term_clean <- term_clean
-    df$log10_p <- -log10(df$P.value)
-
-    df$Term_id <- factor(
-      seq_len(nrow(df)),
-      levels = rev(
-        seq_len(nrow(df))
-      )
-    )
-
-    y_labels <- stats::setNames(
+    df$Term_clean <- stringr::str_trunc(
       df$Term_clean,
-      as.character(
-        seq_len(nrow(df))
+      58
+    )
+
+
+    # --------------------------------------------------------
+    # Smallest P value at top
+    # --------------------------------------------------------
+
+    df$Term_clean <- factor(
+      df$Term_clean,
+      levels = rev(
+        unique(
+          df$Term_clean
+        )
       )
     )
+
+
+    # --------------------------------------------------------
+    # Dot color
+    # --------------------------------------------------------
+
+    df$log10_p <- -log10(
+      df$P.value
+    )
+
+
+    # --------------------------------------------------------
+    # Remove rows with invalid plot values
+    # --------------------------------------------------------
+
+    valid_plot <- (
+      !is.na(df$GeneRatio) &
+        is.finite(df$GeneRatio) &
+        !is.na(df$overlap_hit) &
+        is.finite(df$overlap_hit) &
+        !is.na(df$log10_p) &
+        is.finite(df$log10_p)
+    )
+
+
+    df <- df[
+      valid_plot,
+      ,
+      drop = FALSE
+    ]
+
+
+    if (nrow(df) == 0L) {
+
+      message(
+        "No valid plotting values for ",
+        group_name,
+        " - ",
+        database_name
+      )
+
+      return(
+        NULL
+      )
+    }
+
 
     max_ratio <- max(
       df$GeneRatio,
       na.rm = TRUE
     )
 
+
     max_log10_p <- max(
       df$log10_p,
       na.rm = TRUE
     )
 
-    if (!is.finite(max_ratio) || max_ratio <= 0) {
-      max_ratio <- 1
-    }
 
-    if (!is.finite(max_log10_p)) {
-      max_log10_p <- 1.01
-    }
-
+    # Since plotted pathways have P < 0.05,
+    # max_log10_p should normally be > 1.
+    # This protects against an invalid color-scale range.
     color_upper <- max(
       1.01,
       max_log10_p
     )
 
+
+    if (
+      !is.finite(max_ratio) ||
+        max_ratio <= 0
+    ) {
+
+      max_ratio <- 1
+    }
+
+
+    # ========================================================
+    # Dotplot
+    # ========================================================
+
     p <- ggplot2::ggplot(
       df,
       ggplot2::aes(
         x = GeneRatio,
-        y = Term_id
+        y = Term_clean
       )
     ) +
+
       ggplot2::geom_point(
         ggplot2::aes(
           size = overlap_hit,
@@ -625,6 +999,7 @@ ChIPSPenrichment <- function(
         ),
         alpha = 0.95
       ) +
+
       ggplot2::scale_color_gradientn(
         colors = c(
           "#2F8DD8",
@@ -640,6 +1015,7 @@ ChIPSPenrichment <- function(
           -log[10](P)
         )
       ) +
+
       ggplot2::scale_size_continuous(
         range = c(
           1.8,
@@ -650,6 +1026,7 @@ ChIPSPenrichment <- function(
         ),
         name = "Gene count"
       ) +
+
       ggplot2::scale_x_continuous(
         limits = c(
           0,
@@ -662,9 +1039,7 @@ ChIPSPenrichment <- function(
           )
         )
       ) +
-      ggplot2::scale_y_discrete(
-        labels = y_labels
-      ) +
+
       ggplot2::labs(
         title = paste0(
           group_name,
@@ -674,7 +1049,9 @@ ChIPSPenrichment <- function(
         x = "Gene ratio",
         y = NULL
       ) +
+
       theme_nature_dot() +
+
       ggplot2::theme(
         plot.margin = ggplot2::margin(
           5,
@@ -685,17 +1062,24 @@ ChIPSPenrichment <- function(
         legend.position = "right"
       )
 
+
+    # ========================================================
+    # Output filenames
+    # ========================================================
+
     safe_db <- gsub(
       "[^A-Za-z0-9]+",
       "_",
       database_name
     )
 
+
     safe_group <- gsub(
       "[^A-Za-z0-9]+",
       "_",
       group_name
     )
+
 
     pdf_file <- file.path(
       out_dir,
@@ -708,6 +1092,7 @@ ChIPSPenrichment <- function(
       )
     )
 
+
     png_file <- file.path(
       out_dir,
       paste0(
@@ -719,20 +1104,45 @@ ChIPSPenrichment <- function(
       )
     )
 
-    pdf_device <- if (isTRUE(capabilities("cairo"))) {
-      grDevices::cairo_pdf
+
+    # ========================================================
+    # Save PDF
+    # ========================================================
+
+    if (capabilities("cairo")) {
+
+      ggplot2::ggsave(
+        filename = pdf_file,
+        plot = p,
+        device = grDevices::cairo_pdf,
+        width = 6.6,
+        height = 3.6,
+        units = "in"
+      )
+
     } else {
-      "pdf"
+
+      warning(
+        "Cairo graphics are not available. ",
+        "Using the standard PDF device for ",
+        basename(pdf_file),
+        "."
+      )
+
+      ggplot2::ggsave(
+        filename = pdf_file,
+        plot = p,
+        device = "pdf",
+        width = 6.6,
+        height = 3.6,
+        units = "in"
+      )
     }
 
-    ggplot2::ggsave(
-      filename = pdf_file,
-      plot = p,
-      device = pdf_device,
-      width = 6.6,
-      height = 3.6,
-      units = "in"
-    )
+
+    # ========================================================
+    # Save PNG
+    # ========================================================
 
     ggplot2::ggsave(
       filename = png_file,
@@ -740,60 +1150,89 @@ ChIPSPenrichment <- function(
       width = 6.6,
       height = 3.6,
       units = "in",
-      dpi = 600
+      dpi = 600,
+      bg = "white"
     )
 
-    p
+
+    return(
+      p
+    )
   }
 
+
   # ==========================================================
-  # 9. Generate gene sets
+  # 12. Read input gene lists
   # ==========================================================
+
+  message(
+    "--------------------------------------------------"
+  )
+
+  message(
+    "Reading annotated gene lists"
+  )
+
+  message(
+    "--------------------------------------------------"
+  )
+
 
   chip_genes <- get_gene_list(
-    chip_file
+    file = chip_file,
+    symbol_column = symbol_col
   )
 
+
   chipsp_genes <- get_gene_list(
-    chipsp_file
+    file = chipsp_file,
+    symbol_column = symbol_col
   )
+
 
   chipsp_only_genes <- setdiff(
     chipsp_genes,
     chip_genes
   )
 
+
   chip_only_genes <- setdiff(
     chip_genes,
     chipsp_genes
   )
+
 
   shared_genes <- intersect(
     chip_genes,
     chipsp_genes
   )
 
-  gene_sets <- list(
-    ChIP = chip_genes,
-    ChIPSP = chipsp_genes,
-    ChIPSP_only = chipsp_only_genes,
-    ChIP_only = chip_only_genes,
-    Shared = shared_genes
-  )
 
   # ==========================================================
-  # 10. Save gene summary and gene lists
+  # 13. Gene-set summary
   # ==========================================================
 
   gene_summary <- data.frame(
-    Category = names(gene_sets),
-    Gene_count = vapply(
-      gene_sets,
-      length,
-      integer(1)
+
+    Category = c(
+      "ChIP",
+      "ChIPSP",
+      "ChIPSP_only",
+      "ChIP_only",
+      "Shared"
     ),
+
+    Gene_count = c(
+      length(chip_genes),
+      length(chipsp_genes),
+      length(chipsp_only_genes),
+      length(chip_only_genes),
+      length(shared_genes)
+    ),
+
     stringsAsFactors = FALSE
   )
+
 
   utils::write.csv(
     gene_summary,
@@ -801,9 +1240,9 @@ ChIPSPenrichment <- function(
       out_dir,
       "Gene_set_summary.csv"
     ),
-    row.names = FALSE,
-    quote = FALSE
+    row.names = FALSE
   )
+
 
   writeLines(
     chip_genes,
@@ -813,6 +1252,7 @@ ChIPSPenrichment <- function(
     )
   )
 
+
   writeLines(
     chipsp_genes,
     con = file.path(
@@ -820,6 +1260,7 @@ ChIPSPenrichment <- function(
       "ChIPSP_gene_list.txt"
     )
   )
+
 
   writeLines(
     chipsp_only_genes,
@@ -829,6 +1270,7 @@ ChIPSPenrichment <- function(
     )
   )
 
+
   writeLines(
     chip_only_genes,
     con = file.path(
@@ -836,6 +1278,7 @@ ChIPSPenrichment <- function(
       "ChIP_only_gene_list.txt"
     )
   )
+
 
   writeLines(
     shared_genes,
@@ -845,63 +1288,112 @@ ChIPSPenrichment <- function(
     )
   )
 
-  print(gene_summary)
+
+  print(
+    gene_summary
+  )
+
 
   # ==========================================================
-  # 11. Run Enrichr for all groups
+  # 14. Run Enrichr
   # ==========================================================
 
-  enrichment_results <- list(
-    ChIP = run_enrichr_save(
-      chip_genes,
-      "ChIP"
+  enr_chip <- run_enrichr_save(
+    gene_list = chip_genes,
+    group_name = "ChIP"
+  )
+
+
+  enr_chipsp <- run_enrichr_save(
+    gene_list = chipsp_genes,
+    group_name = "ChIPSP"
+  )
+
+
+  enr_chipsp_only <- run_enrichr_save(
+    gene_list = chipsp_only_genes,
+    group_name = "ChIPSP_only"
+  )
+
+
+  enr_chip_only <- run_enrichr_save(
+    gene_list = chip_only_genes,
+    group_name = "ChIP_only"
+  )
+
+
+  enr_shared <- run_enrichr_save(
+    gene_list = shared_genes,
+    group_name = "Shared"
+  )
+
+
+  # ==========================================================
+  # 15. Extract and combine enrichment results
+  # ==========================================================
+
+  summary_parts <- list(
+
+    extract_top_terms(
+      enr_list = enr_chip,
+      group_name = "ChIP",
+      keep_n = enrichment_top_n
     ),
-    ChIPSP = run_enrichr_save(
-      chipsp_genes,
-      "ChIPSP"
+
+    extract_top_terms(
+      enr_list = enr_chipsp,
+      group_name = "ChIPSP",
+      keep_n = enrichment_top_n
     ),
-    ChIPSP_only = run_enrichr_save(
-      chipsp_only_genes,
-      "ChIPSP_only"
+
+    extract_top_terms(
+      enr_list = enr_chipsp_only,
+      group_name = "ChIPSP_only",
+      keep_n = enrichment_top_n
     ),
-    ChIP_only = run_enrichr_save(
-      chip_only_genes,
-      "ChIP_only"
+
+    extract_top_terms(
+      enr_list = enr_chip_only,
+      group_name = "ChIP_only",
+      keep_n = enrichment_top_n
     ),
-    Shared = run_enrichr_save(
-      shared_genes,
-      "Shared"
+
+    extract_top_terms(
+      enr_list = enr_shared,
+      group_name = "Shared",
+      keep_n = enrichment_top_n
     )
   )
 
-  # ==========================================================
-  # 12. Merge Enrichr results
-  # ==========================================================
-
-  summary_parts <- lapply(
-    names(enrichment_results),
-    function(group_name) {
-      extract_top_terms(
-        enrichment_results[[group_name]],
-        group_name
-      )
-    }
-  )
 
   summary_parts <- Filter(
-    Negate(is.null),
+    Negate(
+      is.null
+    ),
     summary_parts
   )
 
+
   if (length(summary_parts) == 0L) {
+
+    warning(
+      "No Enrichr results were available for any gene group."
+    )
+
     summary_all <- data.frame()
+
   } else {
+
     summary_all <- do.call(
       rbind,
       summary_parts
     )
-    rownames(summary_all) <- NULL
+
+    rownames(
+      summary_all
+    ) <- NULL
   }
+
 
   utils::write.csv(
     summary_all,
@@ -909,52 +1401,125 @@ ChIPSPenrichment <- function(
       out_dir,
       "Combined_Enrichr_results_all_groups.csv"
     ),
-    row.names = FALSE,
-    quote = FALSE
+    row.names = FALSE
   )
 
+
   # ==========================================================
-  # 13. Generate figures
+  # 16. Generate dotplots
   # ==========================================================
 
-  plot_list <- list()
+  groups_to_plot <- c(
+    "ChIP",
+    "ChIPSP",
+    "ChIPSP_only",
+    "Shared"
+  )
+
+
+  plots <- list()
+
 
   if (nrow(summary_all) > 0L) {
 
-    for (group_name in groups_to_plot) {
+    for (g in groups_to_plot) {
 
-      for (database_name in databases) {
+      plots[[g]] <- list()
 
-        plot_key <- paste0(
-          group_name,
-          "__",
-          database_name
+
+      for (db in databases) {
+
+        p <- plot_enrichr_dotplot(
+          summary_table = summary_all,
+          group_name = g,
+          database_name = db
         )
 
-        plot_list[[plot_key]] <- plot_enrichr_dotplot(
-          summary_all = summary_all,
-          group_name = group_name,
-          database_name = database_name
-        )
+
+        plots[[g]][[db]] <- p
       }
     }
   }
 
+
+  # ==========================================================
+  # 17. Completion summary
+  # ==========================================================
+
   message(
-    "Enrichr analysis completed. Output directory: ",
+    "--------------------------------------------------"
+  )
+
+  message(
+    "ChIP-SP Enrichr analysis completed."
+  )
+
+  message(
+    "Output directory: ",
     normalizePath(
       out_dir,
       mustWork = FALSE
     )
   )
 
+  message(
+    "ChIP genes: ",
+    length(chip_genes)
+  )
+
+  message(
+    "ChIP-SP genes: ",
+    length(chipsp_genes)
+  )
+
+  message(
+    "ChIP-SP-only genes: ",
+    length(chipsp_only_genes)
+  )
+
+  message(
+    "ChIP-only genes: ",
+    length(chip_only_genes)
+  )
+
+  message(
+    "Shared genes: ",
+    length(shared_genes)
+  )
+
+  message(
+    "--------------------------------------------------"
+  )
+
+
+  # ==========================================================
+  # 18. Return
+  # ==========================================================
+
   invisible(
     list(
-      gene_sets = gene_sets,
+
       gene_summary = gene_summary,
-      enrichment = enrichment_results,
+
+      genes = list(
+        ChIP = chip_genes,
+        ChIPSP = chipsp_genes,
+        ChIPSP_only = chipsp_only_genes,
+        ChIP_only = chip_only_genes,
+        Shared = shared_genes
+      ),
+
+      enrichment = list(
+        ChIP = enr_chip,
+        ChIPSP = enr_chipsp,
+        ChIPSP_only = enr_chipsp_only,
+        ChIP_only = enr_chip_only,
+        Shared = enr_shared
+      ),
+
       combined_results = summary_all,
-      plots = plot_list
+
+      plots = plots
     )
   )
 }
