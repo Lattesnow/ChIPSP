@@ -1,5 +1,5 @@
 ---
-title: "ChIPSP: Core Integration of ChIP-seq and Hi-C Data"
+title: "ChIPSP: Integration of ChIP-seq and Hi-C Data for Spatial Gene Regulation"
 author: "Tianyi Zhou"
 package: ChIPSP
 output: rmarkdown::html_vignette
@@ -12,5 +12,788 @@ vignette: >
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.align = "center"
 )
+```
+
+# Introduction
+
+`ChIPSP` is an R package for integrating ChIP-seq transcription factor binding
+with Hi-C chromatin interaction data to identify spatially linked regulatory
+regions.
+
+The ChIP-SP workflow combines information from:
+
+- ChIP-seq peak position and signal strength
+- Hi-C chromatin loop coordinates
+- Hi-C loop confidence
+- gene annotation
+- pathway and functional enrichment
+
+The current workflow consists of five major steps:
+
+1. Optional removal of chromosome X and chromosome Y interactions
+2. Merging Hi-C loop files across replicates and/or resolutions
+3. ChIP-SP spatial integration and ranking
+4. Gene annotation
+5. Enrichr functional enrichment analysis
+
+The major exported functions are:
+
+```{r functions}
+library(ChIPSP)
+
+getNamespaceExports("ChIPSP")
+```
+
+The primary workflow functions are:
+
+```text
+removeXYChromosomes()
+mergeHiCLoops()
+readChIPFile()
+chipSPLink()
+ChIPSPannotation()
+ChIPSPenrichment()
+```
+
+# Conceptual Framework
+
+Hi-C identifies genomic regions that interact in three-dimensional chromatin
+space. However, a Hi-C loop anchor generally represents a genomic interval
+rather than an exact nucleotide-level regulatory element.
+
+ChIP-SP integrates ChIP-seq peaks with these Hi-C loop anchors.
+
+If a ChIP-seq peak overlaps one anchor of a Hi-C loop, the interacting partner
+anchor is identified as a spatially linked regulatory region.
+
+Conceptually:
+
+```text
+ChIP-seq peak
+      |
+      v
+Hi-C anchor 1
+      |
+      | chromatin interaction
+      v
+Hi-C anchor 2
+      |
+      v
+Spatially linked regulatory region
+```
+
+The same procedure is performed in both directions:
+
+```text
+ChIP overlap with BIN1 -> project to BIN2
+ChIP overlap with BIN2 -> project to BIN1
+```
+
+ChIP-SP then ranks spatially linked regions using information from both
+ChIP-seq and Hi-C.
+
+The ranking incorporates:
+
+- ChIP-seq signal strength (`pileup`)
+- Hi-C loop confidence (`FDR`)
+
+The current ChIP-SP score is based on normalized ChIP-seq signal and normalized
+Hi-C FDR:
+
+```text
+score = pileup_norm - fdr_norm
+```
+
+Higher ChIP-seq signal and lower Hi-C FDR therefore favor a higher ChIP-SP
+ranking.
+
+# Installation
+
+The development version of `ChIPSP` can be installed from GitHub.
+
+If a previous version is already installed, it can first be removed:
+
+```{r install, eval=FALSE}
+remove.packages("ChIPSP")
+```
+
+Install the current version from the `main` branch:
+
+```{r install-github, eval=FALSE}
+install.packages("remotes")
+
+remotes::install_github(
+  "Lattesnow/ChIPSP@main",
+  force = TRUE,
+  upgrade = "never"
+)
+```
+
+Load the package:
+
+```{r load-package, eval=FALSE}
+library(ChIPSP)
+```
+
+# Input Data
+
+A typical ChIP-SP analysis requires:
+
+1. one or more Hi-C loop files
+2. a ChIP-seq peak file
+
+Input files may be placed in the current working directory or supplied using
+full file paths.
+
+## Hi-C Input
+
+Hi-C files should contain the two genomic loop anchors together with an
+interaction confidence value.
+
+The merged Hi-C table used by `chipSPLink()` contains fields corresponding to:
+
+```text
+BIN1_CHR
+BIN1_START
+BIN1_END
+BIN2_CHR
+BIN2_START
+BIN2_END
+FDR
+```
+
+Multiple Hi-C files may represent:
+
+- biological replicates
+- different loop-calling resolutions
+- different compatible Hi-C datasets
+
+These files can be combined using `mergeHiCLoops()`.
+
+## ChIP-seq Input
+
+ChIP-seq peak files may be provided in commonly used formats including:
+
+```text
+BED
+CSV
+TSV
+TXT
+TAB
+XLS
+XLSX
+```
+
+The ChIP-SP analysis requires genomic coordinates and ChIP-seq signal
+information.
+
+The ChIP-seq signal used in ChIP-SP ranking is represented by:
+
+```text
+pileup
+```
+
+The ChIP-seq and Hi-C data should use the same reference genome.
+
+For example:
+
+```text
+hg19 ChIP-seq + hg19 Hi-C
+hg38 ChIP-seq + hg38 Hi-C
+mm9 ChIP-seq + mm9 Hi-C
+mm10 ChIP-seq + mm10 Hi-C
+```
+
+Genome builds should not be mixed within the same analysis.
+
+# Step 1: Remove Chromosome X and Y
+
+`removeXYChromosomes()` optionally removes interactions involving chromosome X
+or chromosome Y.
+
+When no file names are provided, the function can search the current directory
+for compatible Hi-C files.
+
+```{r remove-xy, eval=FALSE}
+hic_files_clean <- removeXYChromosomes(
+  path = getwd()
+)
+```
+
+The returned object contains the paths of the filtered Hi-C files.
+
+These paths can be passed directly to `mergeHiCLoops()`.
+
+```{r remove-xy-output, eval=FALSE}
+hic_files_clean
+```
+
+This step is optional.
+
+If chromosome X or chromosome Y interactions are relevant to the biological
+question, the original Hi-C files can instead be passed directly to the next
+step.
+
+# Step 2: Merge Hi-C Loop Files
+
+`mergeHiCLoops()` combines Hi-C loop files into one unified loop table.
+
+For example:
+
+```{r merge-hic, eval=FALSE}
+hic_df <- mergeHiCLoops(
+  hic_files_clean
+)
+```
+
+The resulting object is a `data.frame` containing the merged Hi-C loops.
+
+```{r inspect-hic, eval=FALSE}
+head(hic_df)
+dim(hic_df)
+```
+
+The merged table can then be passed directly to `chipSPLink()`.
+
+# Step 3: ChIP-SP Spatial Integration
+
+`chipSPLink()` performs the central ChIP-SP spatial integration.
+
+A minimal call is:
+
+```{r chipsp, eval=FALSE}
+chipsp_results <- chipSPLink(
+  hic_df = hic_df
+)
+```
+
+When `chip_file` is not explicitly supplied, `chipSPLink()` uses
+`readChIPFile()` to identify a compatible ChIP-seq file in the working
+directory.
+
+For example, a file named:
+
+```text
+r1881_hg19_test_peaks_ChIP.bed
+```
+
+can be automatically detected.
+
+The ChIP file can also be specified explicitly:
+
+```{r chipsp-explicit, eval=FALSE}
+chipsp_results <- chipSPLink(
+  chip_file = "r1881_hg19_test_peaks_ChIP.bed",
+  hic_df = hic_df
+)
+```
+
+By default, the results are written to:
+
+```text
+ChIPSP_results.csv
+```
+
+The returned object is also available directly in R:
+
+```{r inspect-chipsp, eval=FALSE}
+head(chipsp_results)
+dim(chipsp_results)
+```
+
+Typical ChIP-SP output columns include:
+
+```text
+chr
+start
+end
+pileup
+FDR
+source_anchor
+pileup_norm
+fdr_norm
+score
+rank
+```
+
+`source_anchor` indicates whether the spatial projection originated from the
+first or second Hi-C loop anchor.
+
+Duplicate projected rows generated within the same projection process are
+removed. However, an identical spatial interaction independently generated
+from the two different anchor-projection processes is retained as an
+independent observation.
+
+# Step 4: Gene Annotation
+
+`ChIPSPannotation()` annotates both conventional ChIP-seq peaks and ChIP-SP
+spatially linked regions to genes.
+
+The function supports human and mouse reference genomes.
+
+## Supported Species and Genome Builds
+
+The currently supported combinations are:
+
+| Species | `species` | `ref_genome` |
+|:--------|:----------|:-------------|
+| Human | `"human"` | `"hg19"` |
+| Human | `"human"` | `"hg38"` |
+| Mouse | `"mouse"` | `"mm9"` |
+| Mouse | `"mouse"` | `"mm10"` |
+
+The species and genome build must correspond.
+
+For example:
+
+```text
+human + hg19   valid
+human + hg38   valid
+mouse + mm9    valid
+mouse + mm10   valid
+
+human + mm10   invalid
+mouse + hg38   invalid
+```
+
+## Human hg19
+
+For human data aligned to hg19:
+
+```{r annotation-hg19, eval=FALSE}
+annotation_results <- ChIPSPannotation(
+  chip_file = "r1881_hg19_test_peaks_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "human",
+  ref_genome = "hg19"
+)
+```
+
+The corresponding genome annotation resource is:
+
+```text
+TxDb.Hsapiens.UCSC.hg19.knownGene
+```
+
+and human gene symbols are obtained using:
+
+```text
+org.Hs.eg.db
+```
+
+## Human hg38
+
+For human data aligned to hg38:
+
+```{r annotation-hg38, eval=FALSE}
+annotation_results <- ChIPSPannotation(
+  chip_file = "example_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "human",
+  ref_genome = "hg38"
+)
+```
+
+The corresponding annotation resource is:
+
+```text
+TxDb.Hsapiens.UCSC.hg38.knownGene
+```
+
+## Mouse mm9
+
+For mouse data aligned to mm9:
+
+```{r annotation-mm9, eval=FALSE}
+annotation_results <- ChIPSPannotation(
+  chip_file = "example_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "mouse",
+  ref_genome = "mm9"
+)
+```
+
+The corresponding resources are:
+
+```text
+TxDb.Mmusculus.UCSC.mm9.knownGene
+org.Mm.eg.db
+```
+
+## Mouse mm10
+
+For mouse data aligned to mm10:
+
+```{r annotation-mm10, eval=FALSE}
+annotation_results <- ChIPSPannotation(
+  chip_file = "example_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "mouse",
+  ref_genome = "mm10"
+)
+```
+
+The corresponding resources are:
+
+```text
+TxDb.Mmusculus.UCSC.mm10.knownGene
+org.Mm.eg.db
+```
+
+## Annotation Distance
+
+The default annotation window is:
+
+```text
++/- 5000 bp
+```
+
+This is controlled by:
+
+```r
+binding_bp = 5000
+```
+
+For example:
+
+```{r annotation-distance, eval=FALSE}
+annotation_results <- ChIPSPannotation(
+  chip_file = "r1881_hg19_test_peaks_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "human",
+  ref_genome = "hg19",
+  binding_bp = 5000
+)
+```
+
+Users may modify this distance according to the biological question.
+
+## Annotation Outputs
+
+By default, two files are generated:
+
+```text
+ChIP_anno_genes_upAdown_UCSC_Control.csv
+ChIP_anno_genes_upAdown_UCSC_CHIPSP.csv
+```
+
+The first contains genes associated with conventional ChIP-seq peaks.
+
+The second contains genes associated with ChIP-SP spatial regions.
+
+# Step 5: Enrichr Analysis
+
+`ChIPSPenrichment()` performs functional enrichment analysis using the output
+from `ChIPSPannotation()`.
+
+Because the default filenames produced by `ChIPSPannotation()` are also the
+default input filenames expected by `ChIPSPenrichment()`, the standard analysis
+can be run with:
+
+```{r enrichment, eval=FALSE}
+enrich_results <- ChIPSPenrichment()
+```
+
+The function constructs five gene sets:
+
+```text
+ChIP
+ChIPSP
+ChIPSP_only
+ChIP_only
+Shared
+```
+
+These represent:
+
+- `ChIP`: genes associated with conventional ChIP-seq peaks
+- `ChIPSP`: genes associated with ChIP-SP regions
+- `ChIPSP_only`: genes detected only through ChIP-SP
+- `ChIP_only`: genes detected only through conventional ChIP annotation
+- `Shared`: genes detected by both approaches
+
+## Default Enrichr Databases
+
+The default analysis uses:
+
+```{r enrichment-databases, eval=FALSE}
+c(
+  "GO_Biological_Process_2023",
+  "GO_Cellular_Component_2023",
+  "GO_Molecular_Function_2023",
+  "KEGG_2021_Human",
+  "Reactome_2022",
+  "ChEA_2022",
+  "MSigDB_Hallmark_2020"
+)
+```
+
+The databases can be customized:
+
+```{r enrichment-custom, eval=FALSE}
+enrich_results <- ChIPSPenrichment(
+  databases = c(
+    "GO_Biological_Process_2023",
+    "Reactome_2022",
+    "ChEA_2022"
+  )
+)
+```
+
+The default database collection currently contains a human KEGG database.
+Users performing mouse analyses should select Enrichr databases appropriate
+for the organism and analysis.
+
+## Enrichment Dotplots
+
+For the generated dotplots:
+
+- pathways are selected and ranked by nominal P value
+- the smallest P value is displayed at the top
+- dot color represents `-log10(P)`
+- dot size represents the number of overlapping genes
+- the x-axis represents gene ratio
+
+Gene ratio is calculated as:
+
+```text
+number of overlapping genes
+---------------------------
+total genes in the pathway
+```
+
+The default significance threshold for displayed pathways is:
+
+```text
+P < 0.05
+```
+
+The default output directory is:
+
+```text
+Enrichr_dotplots/
+```
+
+# Complete Human hg19 Workflow
+
+The following example shows the complete workflow for human hg19 data.
+
+```{r complete-workflow, eval=FALSE}
+library(ChIPSP)
+
+# ------------------------------------------------------------
+# Step 1
+# Remove chromosome X and chromosome Y
+# ------------------------------------------------------------
+
+hic_files_clean <- removeXYChromosomes(
+  path = getwd()
+)
+
+
+# ------------------------------------------------------------
+# Step 2
+# Merge Hi-C loops
+# ------------------------------------------------------------
+
+hic_df <- mergeHiCLoops(
+  hic_files_clean
+)
+
+
+# ------------------------------------------------------------
+# Step 3
+# Run ChIP-SP
+# ------------------------------------------------------------
+
+chipsp_results <- chipSPLink(
+  hic_df = hic_df
+)
+
+
+# ------------------------------------------------------------
+# Step 4
+# Gene annotation
+# ------------------------------------------------------------
+
+annotation_results <- ChIPSPannotation(
+  chip_file = "r1881_hg19_test_peaks_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "human",
+  ref_genome = "hg19"
+)
+
+
+# ------------------------------------------------------------
+# Step 5
+# Enrichr analysis
+# ------------------------------------------------------------
+
+enrich_results <- ChIPSPenrichment()
+```
+
+# Complete Workflow Without Removing X and Y
+
+The chromosome X/Y filtering step is optional.
+
+If sex chromosomes should be retained:
+
+```{r workflow-with-xy, eval=FALSE}
+library(ChIPSP)
+
+hic_files <- list.files(
+  pattern = "HiC\\.(xls|xlsx|csv|tsv|txt|bed|tab)$",
+  full.names = TRUE,
+  ignore.case = TRUE
+)
+
+hic_df <- mergeHiCLoops(
+  hic_files
+)
+
+chipsp_results <- chipSPLink(
+  hic_df = hic_df
+)
+
+annotation_results <- ChIPSPannotation(
+  chip_file = "r1881_hg19_test_peaks_ChIP.bed",
+  chipsp_file = "ChIPSP_results.csv",
+  species = "human",
+  ref_genome = "hg19"
+)
+
+enrich_results <- ChIPSPenrichment()
+```
+
+# Main Output Files
+
+A standard analysis produces several classes of output.
+
+## Filtered Hi-C Files
+
+When `removeXYChromosomes()` is used, filtered Hi-C files are generated with
+chromosome X and chromosome Y interactions removed.
+
+## ChIP-SP Spatial Results
+
+The primary ChIP-SP result is:
+
+```text
+ChIPSP_results.csv
+```
+
+## Gene Annotation
+
+The default annotation outputs are:
+
+```text
+ChIP_anno_genes_upAdown_UCSC_Control.csv
+ChIP_anno_genes_upAdown_UCSC_CHIPSP.csv
+```
+
+## Enrichment Results
+
+The enrichment workflow creates:
+
+```text
+Enrichr_dotplots/
+```
+
+This directory contains:
+
+- gene lists
+- gene-set summary
+- individual Enrichr database result tables
+- combined enrichment results
+- PDF enrichment dotplots
+- PNG enrichment dotplots
+
+# Recommended Workflow Structure
+
+The overall ChIP-SP analysis can be summarized as:
+
+```text
+Hi-C loop files
+       |
+       v
+removeXYChromosomes()
+       |
+       v
+mergeHiCLoops()
+       |
+       v
+Merged Hi-C loop table
+       |
+       +-------------------+
+       |                   |
+       |              ChIP-seq peaks
+       |                   |
+       +---------+---------+
+                 |
+                 v
+             chipSPLink()
+                 |
+                 v
+        ChIPSP_results.csv
+                 |
+                 v
+        ChIPSPannotation()
+                 |
+        +--------+--------+
+        |                 |
+        v                 v
+Conventional ChIP     ChIP-SP genes
+      genes
+        |                 |
+        +--------+--------+
+                 |
+                 v
+        ChIPSPenrichment()
+                 |
+                 v
+      Functional enrichment
+```
+
+# Important Considerations
+
+ChIP-SP performance depends directly on the quality of the underlying ChIP-seq
+and Hi-C data.
+
+Users should consider:
+
+- ChIP-seq peak quality
+- ChIP-seq signal strength
+- Hi-C sequencing depth
+- Hi-C loop-calling quality
+- Hi-C loop-calling resolution
+- the number of detected Hi-C loops
+- chromosome naming conventions
+- compatibility of genome builds
+- the gene annotation strategy used downstream
+
+The ChIP-seq and Hi-C datasets must correspond to the same genome build before
+spatial integration.
+
+For example:
+
+```text
+Correct:
+hg19 ChIP-seq + hg19 Hi-C + hg19 annotation
+
+Incorrect:
+hg19 ChIP-seq + hg38 Hi-C + hg19 annotation
+```
+
+If datasets use different genome builds, genomic coordinates should be
+converted to a common reference genome before running ChIP-SP.
+
+# Session Information
+
+For reproducibility, session information can be recorded using:
+
+```{r session-info}
+sessionInfo()
+```
