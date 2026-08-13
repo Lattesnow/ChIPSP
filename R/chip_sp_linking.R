@@ -294,23 +294,23 @@ chipSPLink <- function(
     )
   }
 
-  chip <- chip[, .(
-    chr,
-    start,
-    end,
-    pileup
-  )]
-
-  hic <- hic[, .(
-    BIN1_CHR,
-    BIN1_START,
-    BIN1_END,
-    BIN2_CHR,
-    BIN2_START,
-    BIN2_END,
-    FDR
-  )]
-
+    chip <- chip[, list(
+      chr,
+      start,
+      end,
+      pileup
+    )]
+    
+    hic <- hic[, list(
+      BIN1_CHR,
+      BIN1_START,
+      BIN1_END,
+      BIN2_CHR,
+      BIN2_START,
+      BIN2_END,
+      FDR
+    )]
+    
   # ----------------------------------------------------------
   # 6. Convert data types
   # ----------------------------------------------------------
@@ -488,15 +488,15 @@ chipSPLink <- function(
     end
   )
 
-  bin1 <- hic[, .(
-    chr = BIN1_CHR,
-    start = BIN1_START,
-    end = BIN1_END,
-    partner_chr = BIN2_CHR,
-    partner_start = BIN2_START,
-    partner_end = BIN2_END,
-    FDR
-  )]
+      bin1 <- hic[, list(
+      chr = BIN1_CHR,
+      start = BIN1_START,
+      end = BIN1_END,
+      partner_chr = BIN2_CHR,
+      partner_start = BIN2_START,
+      partner_end = BIN2_END,
+      FDR
+    )]
 
   data.table::setkey(
     bin1,
@@ -512,7 +512,7 @@ chipSPLink <- function(
     nomatch = 0L
   )
 
-  projected_from_bin1 <- overlap_bin1[, .(
+  projected_from_bin1 <- overlap_bin1[, list(
     chr = partner_chr,
     start = partner_start,
     end = partner_end,
@@ -525,7 +525,7 @@ chipSPLink <- function(
   # 11. Overlap ChIP peaks with BIN2 and project to BIN1
   # ----------------------------------------------------------
 
-  bin2 <- hic[, .(
+  bin2 <- hic[, list(
     chr = BIN2_CHR,
     start = BIN2_START,
     end = BIN2_END,
@@ -549,7 +549,7 @@ chipSPLink <- function(
     nomatch = 0L
   )
 
-  projected_from_bin2 <- overlap_bin2[, .(
+  projected_from_bin2 <- overlap_bin2[, list(
     chr = partner_chr,
     start = partner_start,
     end = partner_end,
