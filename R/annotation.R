@@ -80,26 +80,27 @@ ChIPSPannotation <- function(
     )
   }
 
-  if (species == "human") {
-
-    if (!ref_genome %in% c("hg19", "hg38")) {
-      stop(
-        "For human, `ref_genome` must be \"hg19\" or \"hg38\"."
-      )
+    if (species == "human") {
+    
+      if (!ref_genome %in% c("hg19", "hg38")) {
+        stop(
+          "For human, `ref_genome` must be \"hg19\" or \"hg38\"."
+        )
+      }
+    
+    } else {
+    
+      if (!ref_genome %in% c("mm9", "mm10")) {
+        stop(
+          "For mouse, `ref_genome` must be \"mm9\" or \"mm10\"."
+        )
+      }
+    
     }
-
-  } else {
-
-    if (!ref_genome %in% c("mm9", "mm10")) {
-      stop(
-        "For mouse, `ref_genome` must be \"mm9\" or \"mm10\"."
-      )
-    }
-
-
-  # ==========================================================
-  # 2. Validate files
-  # ==========================================================
+    
+    # ==========================================================
+    # 2. Validate files
+    # ==========================================================
 
   if (
     !is.character(chip_file) ||
