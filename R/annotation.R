@@ -707,9 +707,7 @@ if (species == "human") {
         score_col <- score_col[1]
 
         if (score_col != "score") {
-          anno_df$score <- anno_df[
-            [score_col]
-          ]
+            anno_df$score <- anno_df[[score_col]]
         }
       }
     }
