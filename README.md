@@ -1,16 +1,16 @@
-# ChIP_SP: Spatial ChIP (ChIP-SP) as a New Bioinformatics Tool to Characterize Spatial Gene Regulation
+# ChIP_SP: Spatial ChIP (ChIPSP) as a New Bioinformatics Tool to Characterize Spatial Gene Regulation
 
 ## Overview
 
-`ChIP_SP` is an R package implementing the core **ChIP-SP** algorithm for integrating **ChIP-seq transcription factor binding** with **Hi-C chromatin interaction** data to identify spatially linked regulatory regions.
+`ChIPSP` is an R package implementing the core **ChIP-SP** algorithm for integrating **ChIP-seq transcription factor binding** with **Hi-C chromatin interaction** data to identify spatially linked regulatory regions.
 
-The package is designed to provide the core computational engine for ChIP-SP analysis: **Step 1**, optional removal of sex chromosomes (`chrX`, `chrY`); **Step 2**, merging Hi-C loop outputs across replicates and resolutions; and **Step 3**, spatial linking of ChIP-seq peaks to distal Hi-C loop anchors and ranking interactions.
+The package is designed to provide the core computational engine for ChIPSP analysis: **Step 1**, optional removal of sex chromosomes (`chrX`, `chrY`); **Step 2**, merging Hi-C loop outputs across replicates and resolutions; and **Step 3**, spatial linking of ChIP-seq peaks to distal Hi-C loop anchors and ranking interactions.
 
 Downstream analyses, including **gene annotation**, **pathway enrichment**, and **visualization**, are intentionally excluded from the package API and are instead provided as reference R scripts in `inst/scripts/`. This design allows users full flexibility in annotation strategy and downstream interpretation.
 
 ## Conceptual Framework
 
-Hi-C identifies chromatin loops, but it does not resolve the exact nucleotide-level contact point within each interacting bin. ChIP-SP addresses this limitation by identifying ChIP-seq peaks that overlap one anchor of a Hi-C loop, assigning the partner anchor as a spatially linked regulatory region, and treating the full interacting Hi-C anchor region as a potential transcription factor regulatory site.
+Hi-C identifies chromatin loops, but it does not resolve the exact nucleotide-level contact point within each interacting bin. ChIPSP addresses this limitation by identifying ChIP-seq peaks that overlap one anchor of a Hi-C loop, assigning the partner anchor as a spatially linked regulatory region, and treating the full interacting Hi-C anchor region as a potential transcription factor regulatory site.
 
 Spatial interactions are ranked using both **ChIP-seq peak strength** (`pileup`) and **Hi-C loop confidence** (`FDR`). The resulting ranked regions can then be used for downstream analyses such as gene annotation with `ChIPpeakAnno`, UCSC Genome Browser visualization, KEGG or pathway enrichment analysis, and transcription factor enrichment analysis.
 
@@ -21,7 +21,7 @@ Install the development version from GitHub with:
 ```r
 install.packages("remotes")
 
-remotes::install_github("Lattesnow/ChIP_SP")
+remotes::install_github("Lattesnow/ChIPSP")
 ```
 
 Then load the package with:
@@ -34,7 +34,7 @@ library(ChIPSP)
 
 The current exported package API includes `removeXYChromosomes()`, `mergeHiCLoops()`, and `chipSPLink()`.
 
-`removeXYChromosomes()` is an optional preprocessing function to remove rows on chromosome X and chromosome Y from a genomic interval table. `mergeHiCLoops()` merges Hi-C loop output files across replicates and/or resolutions into a unified loop table. `chipSPLink()` performs the core ChIP-SP spatial integration by linking ChIP-seq peaks to distal Hi-C loop anchors and generating a ranked output table.
+`removeXYChromosomes()` is an optional preprocessing function to remove rows on chromosome X and chromosome Y from a genomic interval table. `mergeHiCLoops()` merges Hi-C loop output files across replicates and/or resolutions into a unified loop table. `chipSPLink()` performs the core ChIPSP spatial integration by linking ChIP-seq peaks to distal Hi-C loop anchors and generating a ranked output table.
 
 ## Input Requirements
 
@@ -131,7 +131,7 @@ The package currently focuses on the core spatial integration workflow. Annotati
 
 ## Citation
 
-If you use `ChIP_SP` in your research, please cite the associated manuscript describing the ChIP-SP method. Citation details will be added once available.
+If you use `ChIPSP` in your research, please cite the associated manuscript describing the ChIPSP method. Citation details will be added once available.
 
 ## Contact
 
