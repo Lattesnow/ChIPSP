@@ -1,5 +1,5 @@
 ---
-title: "ChIPSP: Integration of ChIP-seq and Hi-C Data for Spatial Gene Regulation"
+title: "Spatial ChIP (ChIPSP) as a new Bioinformatics Tool to characterize spatial gene regulation"
 author: "Tianyi Zhou"
 package: ChIPSP
 output: rmarkdown::html_vignette
