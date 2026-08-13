@@ -1,14 +1,26 @@
 Package: ChIPSP
-Title: What the Package Does (One Line, Title Case)
+Title: ChIP-SP Spatial Integration of ChIP-seq and Hi-C Data
 Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Authors@R:
+    person("Tianyi", "Zhou",
+           email = "first.last@example.com",
+           role = c("aut", "cre"))
+Description:
+    Integrates ChIP-seq peaks with Hi-C chromatin interaction data to identify
+    spatially linked genomic regions. ChIP-SP maps ChIP-seq peaks to Hi-C loop
+    anchors, projects regulatory signals to interacting genomic regions, and
+    ranks spatially linked regions using ChIP-seq signal and Hi-C interaction
+    confidence. The package includes functions for preprocessing Hi-C loop
+    files, reading ChIP-seq peak files, removing sex-chromosome interactions,
+    merging Hi-C loops, and performing ChIP-SP spatial integration.
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Suggests: 
+Imports:
+    data.table,
+    readxl
+Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
