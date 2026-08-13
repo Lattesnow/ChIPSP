@@ -21,16 +21,19 @@
 #' The function uses \code{data.table::foverlaps()} for efficient genomic
 #' interval matching and avoids construction of a full Cartesian product.
 #'
-#' @param chip_file Character scalar. Path to a ChIP-seq peak file.
+#' @param chip_file Optional character scalar. Path to a ChIP-seq peak file.
 #'   Supported formats are BED, CSV, TSV, TXT, TAB, XLS, and XLSX.
-#'   Delimited files must contain \code{chr}, \code{start}, and \code{end}
-#'   columns. A \code{pileup} column is optional; when absent, all peaks
-#'   are assigned a pileup value of 1.
+#'   If \code{NULL}, the function automatically searches \code{chip_path}
+#'   for a supported file whose filename ends in \code{ChIP.<extension>}.
 #'
 #' @param hic_df A data.frame or data.table containing Hi-C loops,
 #'   typically returned by \code{mergeHiCLoops()}. Required columns are
 #'   \code{BIN1_CHR}, \code{BIN1_START}, \code{BIN1_END},
 #'   \code{BIN2_CHR}, \code{BIN2_START}, \code{BIN2_END}, and \code{FDR}.
+#'
+#' @param chip_path Character scalar. Directory searched for a ChIP-seq
+#'   peak file when \code{chip_file = NULL}. Default is the current
+#'   working directory.
 #'
 #' @param fdr_cutoff Numeric scalar specifying the maximum Hi-C loop FDR
 #'   retained before overlap analysis. Default is \code{0.05}. Set to
@@ -67,13 +70,13 @@
 #' hic_df <- mergeHiCLoops(hic_files)
 #'
 #' result <- chipSPLink(
-#'   chip_file = "AR_ChIP.bed",
 #'   hic_df = hic_df,
 #'   fdr_cutoff = 0.05
 #' )
 #'
 #' head(result)
 #'
+#' @import data.table
 #' @export
 chipSPLink <- function(
     chip_file = NULL,
@@ -81,7 +84,8 @@ chipSPLink <- function(
     chip_path = getwd(),
     fdr_cutoff = 0.05,
     overlap_mode = "any",
-    add_chr_prefix = TRUE) {
+    add_chr_prefix = TRUE
+) {
 
   # ----------------------------------------------------------
   # 1. Validate inputs
@@ -108,6 +112,24 @@ chipSPLink <- function(
     }
   }
 
+  if (
+    !is.character(chip_path) ||
+      length(chip_path) != 1L ||
+      is.na(chip_path) ||
+      chip_path == ""
+  ) {
+    stop(
+      "`chip_path` must be one valid directory path."
+    )
+  }
+
+  if (!dir.exists(chip_path)) {
+    stop(
+      "ChIP directory not found: ",
+      chip_path
+    )
+  }
+
   if (!is.data.frame(hic_df)) {
     stop(
       "`hic_df` must be a data.frame or data.table, ",
@@ -130,7 +152,10 @@ chipSPLink <- function(
   ) {
     stop(
       "`overlap_mode` must be one of: ",
-      paste(valid_overlap_modes, collapse = ", ")
+      paste(
+        valid_overlap_modes,
+        collapse = ", "
+      )
     )
   }
 
@@ -139,7 +164,9 @@ chipSPLink <- function(
       length(add_chr_prefix) != 1L ||
       is.na(add_chr_prefix)
   ) {
-    stop("`add_chr_prefix` must be TRUE or FALSE.")
+    stop(
+      "`add_chr_prefix` must be TRUE or FALSE."
+    )
   }
 
   # ----------------------------------------------------------
@@ -151,7 +178,11 @@ chipSPLink <- function(
     path = chip_path
   )
 
-  # data.table conversion may otherwise modify the input object by reference
+  chip <- data.table::as.data.table(
+    data.table::copy(chip)
+  )
+
+  # data.table conversion may otherwise modify input by reference
   hic <- data.table::as.data.table(
     data.table::copy(hic_df)
   )
@@ -160,8 +191,13 @@ chipSPLink <- function(
   # 3. Normalize ChIP column names
   # ----------------------------------------------------------
 
-  chip_names <- trimws(colnames(chip))
-  chip_names_upper <- toupper(chip_names)
+  chip_names <- trimws(
+    colnames(chip)
+  )
+
+  chip_names_upper <- toupper(
+    chip_names
+  )
 
   chip_name_map <- c(
     CHR = "chr",
@@ -173,11 +209,18 @@ chipSPLink <- function(
   )
 
   matched_chip_names <- (
-    chip_names_upper %in% names(chip_name_map)
+    chip_names_upper %in%
+      names(chip_name_map)
   )
 
-  chip_names[matched_chip_names] <- unname(
-    chip_name_map[chip_names_upper[matched_chip_names]]
+  chip_names[
+    matched_chip_names
+  ] <- unname(
+    chip_name_map[
+      chip_names_upper[
+        matched_chip_names
+      ]
+    ]
   )
 
   data.table::setnames(
@@ -187,13 +230,24 @@ chipSPLink <- function(
   )
 
   duplicated_chip_names <- unique(
-    colnames(chip)[duplicated(colnames(chip))]
+    colnames(chip)[
+      duplicated(
+        colnames(chip)
+      )
+    ]
   )
 
-  if (length(duplicated_chip_names) > 0L) {
+  if (
+    length(
+      duplicated_chip_names
+    ) > 0L
+  ) {
     stop(
       "ChIP column-name normalization created duplicate columns: ",
-      paste(duplicated_chip_names, collapse = ", ")
+      paste(
+        duplicated_chip_names,
+        collapse = ", "
+      )
     )
   }
 
@@ -201,8 +255,13 @@ chipSPLink <- function(
   # 4. Normalize Hi-C column names
   # ----------------------------------------------------------
 
-  hic_names <- trimws(colnames(hic))
-  hic_names_upper <- toupper(hic_names)
+  hic_names <- trimws(
+    colnames(hic)
+  )
+
+  hic_names_upper <- toupper(
+    hic_names
+  )
 
   hic_name_map <- c(
     BIN1_CHROMOSOME = "BIN1_CHR",
@@ -217,11 +276,18 @@ chipSPLink <- function(
   )
 
   matched_hic_names <- (
-    hic_names_upper %in% names(hic_name_map)
+    hic_names_upper %in%
+      names(hic_name_map)
   )
 
-  hic_names[matched_hic_names] <- unname(
-    hic_name_map[hic_names_upper[matched_hic_names]]
+  hic_names[
+    matched_hic_names
+  ] <- unname(
+    hic_name_map[
+      hic_names_upper[
+        matched_hic_names
+      ]
+    ]
   )
 
   data.table::setnames(
@@ -231,13 +297,24 @@ chipSPLink <- function(
   )
 
   duplicated_hic_names <- unique(
-    colnames(hic)[duplicated(colnames(hic))]
+    colnames(hic)[
+      duplicated(
+        colnames(hic)
+      )
+    ]
   )
 
-  if (length(duplicated_hic_names) > 0L) {
+  if (
+    length(
+      duplicated_hic_names
+    ) > 0L
+  ) {
     stop(
       "Hi-C column-name normalization created duplicate columns: ",
-      paste(duplicated_hic_names, collapse = ", ")
+      paste(
+        duplicated_hic_names,
+        collapse = ", "
+      )
     )
   }
 
@@ -256,14 +333,25 @@ chipSPLink <- function(
     colnames(chip)
   )
 
-  if (length(missing_chip_columns) > 0L) {
+  if (
+    length(
+      missing_chip_columns
+    ) > 0L
+  ) {
     stop(
       "Missing ChIP columns: ",
-      paste(missing_chip_columns, collapse = ", ")
+      paste(
+        missing_chip_columns,
+        collapse = ", "
+      )
     )
   }
 
-  if (!"pileup" %in% colnames(chip)) {
+  if (
+    !"pileup" %in%
+      colnames(chip)
+  ) {
+
     chip[, pileup := 1]
 
     message(
@@ -287,56 +375,98 @@ chipSPLink <- function(
     colnames(hic)
   )
 
-  if (length(missing_hic_columns) > 0L) {
+  if (
+    length(
+      missing_hic_columns
+    ) > 0L
+  ) {
     stop(
       "Missing Hi-C columns: ",
-      paste(missing_hic_columns, collapse = ", ")
+      paste(
+        missing_hic_columns,
+        collapse = ", "
+      )
     )
   }
 
-    chip <- chip[, list(
-      chr,
-      start,
-      end,
-      pileup
-    )]
-    
-    hic <- hic[, list(
-      BIN1_CHR,
-      BIN1_START,
-      BIN1_END,
-      BIN2_CHR,
-      BIN2_START,
-      BIN2_END,
-      FDR
-    )]
-    
+  # Use explicit column-name selection.
+  # This avoids NSE lookup issues inside package namespaces.
+
+  chip <- chip[
+    ,
+    c(
+      "chr",
+      "start",
+      "end",
+      "pileup"
+    ),
+    with = FALSE
+  ]
+
+  hic <- hic[
+    ,
+    c(
+      "BIN1_CHR",
+      "BIN1_START",
+      "BIN1_END",
+      "BIN2_CHR",
+      "BIN2_START",
+      "BIN2_END",
+      "FDR"
+    ),
+    with = FALSE
+  ]
+
   # ----------------------------------------------------------
   # 6. Convert data types
   # ----------------------------------------------------------
 
   chip[, `:=`(
-    chr = trimws(as.character(chr)),
-    start = suppressWarnings(as.integer(start)),
-    end = suppressWarnings(as.integer(end)),
-    pileup = suppressWarnings(as.numeric(pileup))
+    chr = trimws(
+      as.character(chr)
+    ),
+    start = suppressWarnings(
+      as.integer(start)
+    ),
+    end = suppressWarnings(
+      as.integer(end)
+    ),
+    pileup = suppressWarnings(
+      as.numeric(pileup)
+    )
   )]
 
   hic[, `:=`(
-    BIN1_CHR = trimws(as.character(BIN1_CHR)),
-    BIN1_START = suppressWarnings(as.integer(BIN1_START)),
-    BIN1_END = suppressWarnings(as.integer(BIN1_END)),
-    BIN2_CHR = trimws(as.character(BIN2_CHR)),
-    BIN2_START = suppressWarnings(as.integer(BIN2_START)),
-    BIN2_END = suppressWarnings(as.integer(BIN2_END)),
-    FDR = suppressWarnings(as.numeric(FDR))
+    BIN1_CHR = trimws(
+      as.character(BIN1_CHR)
+    ),
+    BIN1_START = suppressWarnings(
+      as.integer(BIN1_START)
+    ),
+    BIN1_END = suppressWarnings(
+      as.integer(BIN1_END)
+    ),
+    BIN2_CHR = trimws(
+      as.character(BIN2_CHR)
+    ),
+    BIN2_START = suppressWarnings(
+      as.integer(BIN2_START)
+    ),
+    BIN2_END = suppressWarnings(
+      as.integer(BIN2_END)
+    ),
+    FDR = suppressWarnings(
+      as.numeric(FDR)
+    )
   )]
 
   # ----------------------------------------------------------
   # 7. Remove invalid rows
   # ----------------------------------------------------------
 
-  n_chip_before_validation <- nrow(chip)
+  n_chip_before_validation <- nrow(
+    chip
+  )
 
   chip <- chip[
     !is.na(chr) &
@@ -348,10 +478,13 @@ chipSPLink <- function(
   ]
 
   n_chip_removed <- (
-    n_chip_before_validation - nrow(chip)
+    n_chip_before_validation -
+      nrow(chip)
   )
 
-  if (n_chip_removed > 0L) {
+  if (
+    n_chip_removed > 0L
+  ) {
     warning(
       "Removed ",
       n_chip_removed,
@@ -359,7 +492,9 @@ chipSPLink <- function(
     )
   }
 
-  n_hic_before_validation <- nrow(hic)
+  n_hic_before_validation <- nrow(
+    hic
+  )
 
   hic <- hic[
     !is.na(BIN1_CHR) &
@@ -376,10 +511,13 @@ chipSPLink <- function(
   ]
 
   n_hic_removed <- (
-    n_hic_before_validation - nrow(hic)
+    n_hic_before_validation -
+      nrow(hic)
   )
 
-  if (n_hic_removed > 0L) {
+  if (
+    n_hic_removed > 0L
+  ) {
     warning(
       "Removed ",
       n_hic_removed,
@@ -393,37 +531,63 @@ chipSPLink <- function(
 
   normalize_chr <- function(x) {
 
-    x <- trimws(as.character(x))
+    x <- trimws(
+      as.character(x)
+    )
 
-    missing_value <- is.na(x) | x == ""
+    missing_value <- (
+      is.na(x) |
+        x == ""
+    )
 
     needs_prefix <- (
       !missing_value &
-        !grepl("^chr", x, ignore.case = TRUE)
+        !grepl(
+          "^chr",
+          x,
+          ignore.case = TRUE
+        )
     )
 
-    x[needs_prefix] <- paste0(
+    x[
+      needs_prefix
+    ] <- paste0(
       "chr",
-      x[needs_prefix]
+      x[
+        needs_prefix
+      ]
     )
 
-    x[!missing_value] <- sub(
+    x[
+      !missing_value
+    ] <- sub(
       "^chr",
       "chr",
-      x[!missing_value],
+      x[
+        !missing_value
+      ],
       ignore.case = TRUE
     )
 
     x
   }
 
-  if (add_chr_prefix) {
+  if (
+    add_chr_prefix
+  ) {
 
-    chip[, chr := normalize_chr(chr)]
+    chip[
+      ,
+      chr := normalize_chr(chr)
+    ]
 
     hic[, `:=`(
-      BIN1_CHR = normalize_chr(BIN1_CHR),
-      BIN2_CHR = normalize_chr(BIN2_CHR)
+      BIN1_CHR = normalize_chr(
+        BIN1_CHR
+      ),
+      BIN2_CHR = normalize_chr(
+        BIN2_CHR
+      )
     )]
   }
 
@@ -438,7 +602,11 @@ chipSPLink <- function(
   # 9. Filter Hi-C loops by FDR
   # ----------------------------------------------------------
 
-  if (!is.null(fdr_cutoff)) {
+  if (
+    !is.null(
+      fdr_cutoff
+    )
+  ) {
 
     if (
       !is.numeric(fdr_cutoff) ||
@@ -453,8 +621,12 @@ chipSPLink <- function(
       )
     }
 
-    if (fdr_cutoff < 1) {
-      hic <- hic[FDR <= fdr_cutoff]
+    if (
+      fdr_cutoff < 1
+    ) {
+      hic <- hic[
+        FDR <= fdr_cutoff
+      ]
     }
   }
 
@@ -463,18 +635,25 @@ chipSPLink <- function(
     nrow(hic)
   )
 
-  if (nrow(chip) == 0L) {
+  if (
+    nrow(chip) == 0L
+  ) {
     stop(
       "No valid ChIP-seq peaks remain after input processing."
     )
   }
 
-  if (nrow(hic) == 0L) {
+  if (
+    nrow(hic) == 0L
+  ) {
+
     warning(
       "No Hi-C loops remain after input processing."
     )
 
-    return(data.frame())
+    return(
+      data.frame()
+    )
   }
 
   # ----------------------------------------------------------
@@ -488,15 +667,15 @@ chipSPLink <- function(
     end
   )
 
-      bin1 <- hic[, list(
-      chr = BIN1_CHR,
-      start = BIN1_START,
-      end = BIN1_END,
-      partner_chr = BIN2_CHR,
-      partner_start = BIN2_START,
-      partner_end = BIN2_END,
-      FDR
-    )]
+  bin1 <- data.table::data.table(
+    chr = hic[["BIN1_CHR"]],
+    start = hic[["BIN1_START"]],
+    end = hic[["BIN1_END"]],
+    partner_chr = hic[["BIN2_CHR"]],
+    partner_start = hic[["BIN2_START"]],
+    partner_end = hic[["BIN2_END"]],
+    FDR = hic[["FDR"]]
+  )
 
   data.table::setkey(
     bin1,
@@ -512,28 +691,28 @@ chipSPLink <- function(
     nomatch = 0L
   )
 
-  projected_from_bin1 <- overlap_bin1[, list(
-    chr = partner_chr,
-    start = partner_start,
-    end = partner_end,
-    pileup,
-    FDR,
+  projected_from_bin1 <- data.table::data.table(
+    chr = overlap_bin1[["partner_chr"]],
+    start = overlap_bin1[["partner_start"]],
+    end = overlap_bin1[["partner_end"]],
+    pileup = overlap_bin1[["pileup"]],
+    FDR = overlap_bin1[["FDR"]],
     source_anchor = "BIN1"
-  )]
+  )
 
   # ----------------------------------------------------------
   # 11. Overlap ChIP peaks with BIN2 and project to BIN1
   # ----------------------------------------------------------
 
-  bin2 <- hic[, list(
-    chr = BIN2_CHR,
-    start = BIN2_START,
-    end = BIN2_END,
-    partner_chr = BIN1_CHR,
-    partner_start = BIN1_START,
-    partner_end = BIN1_END,
-    FDR
-  )]
+  bin2 <- data.table::data.table(
+    chr = hic[["BIN2_CHR"]],
+    start = hic[["BIN2_START"]],
+    end = hic[["BIN2_END"]],
+    partner_chr = hic[["BIN1_CHR"]],
+    partner_start = hic[["BIN1_START"]],
+    partner_end = hic[["BIN1_END"]],
+    FDR = hic[["FDR"]]
+  )
 
   data.table::setkey(
     bin2,
@@ -549,14 +728,14 @@ chipSPLink <- function(
     nomatch = 0L
   )
 
-  projected_from_bin2 <- overlap_bin2[, list(
-    chr = partner_chr,
-    start = partner_start,
-    end = partner_end,
-    pileup,
-    FDR,
+  projected_from_bin2 <- data.table::data.table(
+    chr = overlap_bin2[["partner_chr"]],
+    start = overlap_bin2[["partner_start"]],
+    end = overlap_bin2[["partner_end"]],
+    pileup = overlap_bin2[["pileup"]],
+    FDR = overlap_bin2[["FDR"]],
     source_anchor = "BIN2"
-  )]
+  )
 
   message(
     "Projected rows before within-process duplicate removal: ",
@@ -637,11 +816,13 @@ chipSPLink <- function(
     fill = TRUE
   )
 
-  # Do not deduplicate final_matrix.
+  # IMPORTANT:
   #
-  # An identical row generated independently through BIN1 and BIN2
-  # must remain as two separate rows because it originated from two
-  # different projection processes.
+  # Do NOT deduplicate final_matrix.
+  #
+  # Identical rows generated independently through BIN1 and BIN2
+  # must remain separate because they originated from different
+  # projection processes.
 
   message(
     "Projected rows after within-process duplicate removal: ",
@@ -653,12 +834,19 @@ chipSPLink <- function(
     nrow(final_matrix)
   )
 
-  if (nrow(final_matrix) == 0L) {
+  if (
+    nrow(final_matrix) == 0L
+  ) {
+
     warning(
       "No ChIP-seq peaks overlapped retained Hi-C loop anchors."
     )
 
-    return(as.data.frame(final_matrix))
+    return(
+      as.data.frame(
+        final_matrix
+      )
+    )
   }
 
   # ----------------------------------------------------------
@@ -669,10 +857,21 @@ chipSPLink <- function(
 
     x <- as.numeric(x)
 
-    valid_values <- x[is.finite(x)]
+    valid_values <- x[
+      is.finite(x)
+    ]
 
-    if (length(valid_values) == 0L) {
-      return(rep(NA_real_, length(x)))
+    if (
+      length(
+        valid_values
+      ) == 0L
+    ) {
+      return(
+        rep(
+          NA_real_,
+          length(x)
+        )
+      )
     }
 
     value_range <- range(
@@ -688,26 +887,42 @@ chipSPLink <- function(
         )
       )
     ) {
-      return(rep(0, length(x)))
+      return(
+        rep(
+          0,
+          length(x)
+        )
+      )
     }
 
-    (x - value_range[1]) /
-      (value_range[2] - value_range[1])
+    (
+      x - value_range[1]
+    ) / (
+      value_range[2] -
+        value_range[1]
+    )
   }
 
   final_matrix[
     ,
-    pileup_norm := normalize_01(pileup)
+    pileup_norm := normalize_01(
+      pileup
+    )
   ]
 
   final_matrix[
     ,
-    fdr_norm := normalize_01(FDR)
+    fdr_norm := normalize_01(
+      FDR
+    )
   ]
 
   final_matrix[
     ,
-    score := pileup_norm - fdr_norm
+    score := (
+      pileup_norm -
+        fdr_norm
+    )
   ]
 
   data.table::setorder(
@@ -717,7 +932,10 @@ chipSPLink <- function(
     -pileup
   )
 
-  final_matrix[, rank := seq_len(.N)]
+  final_matrix[
+    ,
+    rank := seq_len(.N)
+  ]
 
   message(
     "Final ChIP-SP output: ",
@@ -725,5 +943,7 @@ chipSPLink <- function(
     " spatially linked rows."
   )
 
-  as.data.frame(final_matrix)
+  as.data.frame(
+    final_matrix
+  )
 }
