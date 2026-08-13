@@ -1,0 +1,4 @@
+Group,bed_file,hit_file,Total_regions,AR_motif_regions,AR_motif_percent
+AR original sites,AR_original_sites.bed,AR_original_ARmotif_hits.txt,8185,2083,25.44899205864386
+ChIP-SP positive bins,AR_ChIPSP_positive_bins.bed,HiC_AR_ChIPSP_positive_ARmotif_hits.txt,1760,1048,59.54545454545455
+ChIP-SP negative bins,AR_ChIPSP_negative_bins_absolute.bed,HiC_AR_ChIPSP_negative_ARmotif_hits.txt,39705,19284,48.5681904042312
