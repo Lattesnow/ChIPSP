@@ -46,6 +46,10 @@
 #'   the \code{"chr"} prefix are normalized before overlap analysis.
 #'   Default is \code{TRUE}.
 #'
+#' @param output_file Character scalar. Output CSV filename or path for
+#'   the final ChIP-SP results. Default is \code{"ChIPSP_results.csv"}.
+#'   Set to \code{NULL} to disable automatic file writing.
+#'
 #' @return A data.frame containing spatially linked genomic regions ranked
 #'   by ChIP-SP score. Output columns include:
 #'
@@ -84,7 +88,8 @@ chipSPLink <- function(
     chip_path = getwd(),
     fdr_cutoff = 0.05,
     overlap_mode = "any",
-    add_chr_prefix = TRUE
+    add_chr_prefix = TRUE,
+    output_file = "ChIPSP_results.csv"
 ) {
 
   # ----------------------------------------------------------
@@ -152,10 +157,7 @@ chipSPLink <- function(
   ) {
     stop(
       "`overlap_mode` must be one of: ",
-      paste(
-        valid_overlap_modes,
-        collapse = ", "
-      )
+      paste(valid_overlap_modes, collapse = ", ")
     )
   }
 
@@ -167,6 +169,20 @@ chipSPLink <- function(
     stop(
       "`add_chr_prefix` must be TRUE or FALSE."
     )
+  }
+
+  if (!is.null(output_file)) {
+
+    if (
+      !is.character(output_file) ||
+        length(output_file) != 1L ||
+        is.na(output_file) ||
+        output_file == ""
+    ) {
+      stop(
+        "`output_file` must be NULL or one valid output file path."
+      )
+    }
   }
 
   # ----------------------------------------------------------
@@ -182,7 +198,6 @@ chipSPLink <- function(
     data.table::copy(chip)
   )
 
-  # data.table conversion may otherwise modify input by reference
   hic <- data.table::as.data.table(
     data.table::copy(hic_df)
   )
@@ -388,9 +403,6 @@ chipSPLink <- function(
       )
     )
   }
-
-  # Use explicit column-name selection.
-  # This avoids NSE lookup issues inside package namespaces.
 
   chip <- chip[
     ,
@@ -651,8 +663,28 @@ chipSPLink <- function(
       "No Hi-C loops remain after input processing."
     )
 
+    empty_result <- data.frame()
+
+    if (!is.null(output_file)) {
+
+      utils::write.csv(
+        empty_result,
+        file = output_file,
+        row.names = FALSE,
+        quote = FALSE
+      )
+
+      message(
+        "Saved empty ChIP-SP output: ",
+        normalizePath(
+          output_file,
+          mustWork = FALSE
+        )
+      )
+    }
+
     return(
-      data.frame()
+      empty_result
     )
   }
 
@@ -842,10 +874,30 @@ chipSPLink <- function(
       "No ChIP-seq peaks overlapped retained Hi-C loop anchors."
     )
 
-    return(
-      as.data.frame(
-        final_matrix
+    result <- as.data.frame(
+      final_matrix
+    )
+
+    if (!is.null(output_file)) {
+
+      utils::write.csv(
+        result,
+        file = output_file,
+        row.names = FALSE,
+        quote = FALSE
       )
+
+      message(
+        "Saved empty ChIP-SP output: ",
+        normalizePath(
+          output_file,
+          mustWork = FALSE
+        )
+      )
+    }
+
+    return(
+      result
     )
   }
 
@@ -937,13 +989,39 @@ chipSPLink <- function(
     rank := seq_len(.N)
   ]
 
+  # ----------------------------------------------------------
+  # 15. Convert and save final ChIP-SP output
+  # ----------------------------------------------------------
+
+  result <- as.data.frame(
+    final_matrix
+  )
+
   message(
     "Final ChIP-SP output: ",
-    nrow(final_matrix),
+    nrow(result),
     " spatially linked rows."
   )
 
-  as.data.frame(
-    final_matrix
+  if (!is.null(output_file)) {
+
+    utils::write.csv(
+      result,
+      file = output_file,
+      row.names = FALSE,
+      quote = FALSE
+    )
+
+    message(
+      "Saved ChIP-SP output: ",
+      normalizePath(
+        output_file,
+        mustWork = FALSE
+      )
+    )
+  }
+
+  return(
+    result
   )
 }
