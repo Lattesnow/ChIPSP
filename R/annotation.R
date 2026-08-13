@@ -737,9 +737,7 @@ if (species == "human") {
 
     anno_df <- anno_df[
       order(
-        -anno_df[
-          [pileup_col]
-        ]
+        -anno_df[[pileup_col]]
       ),
       ,
       drop = FALSE
@@ -751,14 +749,10 @@ if (species == "human") {
     # --------------------------------------------------------
 
     anno_df$rank <- match(
-      anno_df[
-        [pileup_col]
-      ],
+        anno_df[[pileup_col]],
       sort(
         unique(
-          anno_df[
-            [pileup_col]
-          ]
+         anno_df[[pileup_col]]
         ),
         decreasing = TRUE
       )
