@@ -94,8 +94,7 @@ ChIPSPannotation <- function(
       stop(
         "For mouse, `ref_genome` must be \"mm9\" or \"mm10\"."
       )
-    )
-  }
+    }
 
 
   # ==========================================================
