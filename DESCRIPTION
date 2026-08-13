@@ -20,6 +20,9 @@ RoxygenNote: 7.3.3
 Imports:
     data.table,
     readxl,
+    enrichR,
+    ggplot2,
+    scales
     ChIPpeakAnno,
     GenomicRanges,
     IRanges,
