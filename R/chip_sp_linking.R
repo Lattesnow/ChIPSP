@@ -138,86 +138,14 @@ chipSPLink <- function(
   # 2. Read ChIP-seq input
   # ----------------------------------------------------------
 
-  read_chip_file <- function(file) {
+  # ----------------------------------------------------------
+  # 2. Read ChIP-seq input
+  # ----------------------------------------------------------
 
-    extension <- tolower(tools::file_ext(file))
-
-    if (extension == "csv") {
-
-      chip <- data.table::fread(
-        file,
-        sep = ",",
-        header = TRUE,
-        fill = TRUE,
-        data.table = TRUE
-      )
-
-    } else if (extension %in% c("tsv", "txt", "tab")) {
-
-      chip <- data.table::fread(
-        file,
-        sep = "\t",
-        header = TRUE,
-        fill = TRUE,
-        data.table = TRUE
-      )
-
-    } else if (extension == "bed") {
-
-      chip <- data.table::fread(
-        file,
-        sep = "\t",
-        header = FALSE,
-        fill = TRUE,
-        data.table = TRUE
-      )
-
-      if (ncol(chip) < 3L) {
-        stop("BED file must contain at least three columns.")
-      }
-
-      data.table::setnames(
-        chip,
-        old = names(chip)[1:3],
-        new = c("chr", "start", "end")
-      )
-
-      if (
-        ncol(chip) >= 4L &&
-          !"pileup" %in% colnames(chip)
-      ) {
-        data.table::setnames(
-          chip,
-          old = names(chip)[4],
-          new = "pileup"
-        )
-      }
-
-    } else if (extension %in% c("xls", "xlsx")) {
-
-      if (!requireNamespace("readxl", quietly = TRUE)) {
-        stop(
-          "Package `readxl` is required to read Excel files."
-        )
-      }
-
-      chip <- data.table::as.data.table(
-        readxl::read_excel(file)
-      )
-
-    } else {
-
-      stop(
-        "Unsupported ChIP file type: ",
-        extension,
-        ". Supported formats are bed, csv, tsv, txt, tab, xls, and xlsx."
-      )
-    }
-
-    chip
-  }
-
-  chip <- read_chip_file(chip_file)
+  chip <- readChIPFile(
+    file = chip_file,
+    path = chip_path
+  )
 
   # data.table conversion may otherwise modify the input object by reference
   hic <- data.table::as.data.table(
