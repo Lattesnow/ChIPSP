@@ -1,0 +1,64 @@
+GENOME=hg19
+mkdir -p homer_AR_motif
+cd homer_AR_motif
+# perl /home/snowlatte/anaconda3/envs/homer/share/homer/configureHomer.pl -install hg19
+mkdir original_AR_sites
+mkdir chipsp_mirror_bins
+mkdir compare_known_motifs
+
+findMotifsGenome.pl AR_original_sites.bed hg19 homer_AR_original -size given -p 8
+
+findMotifsGenome.pl HiC_AR_positive_bins.bed hg19 homer_HiC_AR_positive -size given -p 12
+
+
+shuf -n 537 AR_ChIPSP_negative_bins_absolute_5kb.bed \
+  > AR_ChIPSP_negative_bins_absolute_5kb_random537.bed
+rm -rf homer_HiC_AR_negative_random537
+
+findMotifsGenome.pl \
+  AR_ChIPSP_negative_bins_absolute_5kb_random537.bed \
+  hg19 \
+  homer_HiC_AR_negative_random583 \
+  -size given \
+  -p 32
+
+
+#Compare pos vs neg HiC files
+
+ findMotifsGenome.pl \
+  AR_ChIPSP_positive_bins.bed \
+  hg19 \
+  homer_HiC_AR_positive_vs_negative \
+  -size given \
+  -bg AR_ChIPSP_negative_bins_absolute.bed \
+  -p 32
+
+find $(dirname $(which findMotifsGenome.pl))/../motifs -iname "*Androgen*"
+find $(dirname $(which findMotifsGenome.pl))/../motifs -iname "*AR*"
+
+Analysis 2 Indentify occurrence of AR in 3 datasets bed files
+AR_MOTIF="original_AR_sites/knownResults/known3.motif"
+
+findMotifsGenome.pl \
+  AR_original_sites.bed \
+  hg19 \
+  scan_AR_original \
+  -size given \
+  -find "$AR_MOTIF" \
+  > AR_original_ARmotif_hits.txt
+
+findMotifsGenome.pl \
+  AR_ChIPSP_positive_bins.bed \
+  hg19 \
+  scan_HiC_AR_positive \
+  -size given \
+  -find "$AR_MOTIF" \
+  > HiC_AR_ChIPSP_positive_ARmotif_hits.txt
+
+findMotifsGenome.pl \
+  AR_ChIPSP_negative_bins_absolute.bed \
+  hg19 \
+  scan_HiC_AR_negative \
+  -size given \
+  -find "$AR_MOTIF" \
+  > HiC_AR_ChIPSP_negative_ARmotif_hits.txt
