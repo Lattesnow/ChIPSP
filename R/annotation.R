@@ -197,40 +197,36 @@ ChIPSPannotation <- function(
   # 5. Select genome annotation database
   # ==========================================================
 
-  if (species == "human") {
+# ==========================================================
+# 5. Select genome annotation database
+# ==========================================================
 
-    if (ref_genome == "hg19") {
+if (species == "human") {
 
-      txdb <-
-        TxDb.Hsapiens.UCSC.hg19.knownGene::
-        TxDb.Hsapiens.UCSC.hg19.knownGene
+  if (ref_genome == "hg19") {
 
-    } else {
-
-      txdb <-
-        TxDb.Hsapiens.UCSC.hg38.knownGene::
-        TxDb.Hsapiens.UCSC.hg38.knownGene
-    }
-
-    orgdb <- "org.Hs.eg.db"
+    txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene::TxDb.Hsapiens.UCSC.hg19.knownGene
 
   } else {
 
-    if (ref_genome == "mm9") {
-
-      txdb <-
-        TxDb.Mmusculus.UCSC.mm9.knownGene::
-        TxDb.Mmusculus.UCSC.mm9.knownGene
-
-    } else {
-
-      txdb <-
-        TxDb.Mmusculus.UCSC.mm10.knownGene::
-        TxDb.Mmusculus.UCSC.mm10.knownGene
-    }
-
-    orgdb <- "org.Mm.eg.db"
+    txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene::TxDb.Hsapiens.UCSC.hg38.knownGene
   }
+
+  orgdb <- "org.Hs.eg.db"
+
+} else {
+
+  if (ref_genome == "mm9") {
+
+    txdb <- TxDb.Mmusculus.UCSC.mm9.knownGene::TxDb.Mmusculus.UCSC.mm9.knownGene
+
+  } else {
+
+    txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene::TxDb.Mmusculus.UCSC.mm10.knownGene
+  }
+
+  orgdb <- "org.Mm.eg.db"
+}
 
 
   message(
