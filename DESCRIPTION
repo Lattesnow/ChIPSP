@@ -10,17 +10,30 @@ Description:
     spatially linked genomic regions. ChIP-SP maps ChIP-seq peaks to Hi-C loop
     anchors, projects regulatory signals to interacting genomic regions, and
     ranks spatially linked regions using ChIP-seq signal and Hi-C interaction
-    confidence. The package includes functions for preprocessing Hi-C loop
-    files, reading ChIP-seq peak files, removing sex-chromosome interactions,
-    merging Hi-C loops, and performing ChIP-SP spatial integration.
+    confidence. The package also supports annotation of conventional ChIP-seq
+    peaks and ChIP-SP regions for human and mouse reference genomes.
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+
 Imports:
     data.table,
-    readxl
+    readxl,
+    ChIPpeakAnno,
+    GenomicRanges,
+    IRanges,
+    S4Vectors,
+    AnnotationDbi
+
 Suggests:
+    org.Hs.eg.db,
+    org.Mm.eg.db,
+    TxDb.Hsapiens.UCSC.hg19.knownGene,
+    TxDb.Hsapiens.UCSC.hg38.knownGene,
+    TxDb.Mmusculus.UCSC.mm9.knownGene,
+    TxDb.Mmusculus.UCSC.mm10.knownGene,
     knitr,
     rmarkdown
+
 VignetteBuilder: knitr
