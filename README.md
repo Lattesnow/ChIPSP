@@ -2,14 +2,14 @@
 
 ## Overview
 
-`ChIPSP` is an R package implementing the **ChIP-SP** workflow for integrating **ChIP-seq transcription factor binding** with **Hi-C chromatin interaction** data to identify spatially linked regulatory regions.
+`ChIPSP` is an R package implementing the **ChIPSP** workflow for integrating **ChIP-seq transcription factor binding** with **Hi-C chromatin interaction** data to identify spatially linked regulatory regions.
 
 The current workflow contains five major steps:
 
 1. Optional removal of chromosome X and chromosome Y interactions.
 2. Merging Hi-C loop outputs across replicates and/or resolutions.
-3. Spatial linking of ChIP-seq peaks to distal Hi-C loop anchors and ranking of ChIP-SP interactions.
-4. Gene annotation of conventional ChIP-seq peaks and ChIP-SP regions.
+3. Spatial linking of ChIP-seq peaks to distal Hi-C loop anchors and ranking of ChIPSP interactions.
+4. Gene annotation of conventional ChIP-seq peaks and ChIPSP regions.
 5. Enrichr-based functional and pathway enrichment analysis.
 
 The package is designed as a modular workflow so that individual components can also be run independently.
@@ -20,9 +20,9 @@ The package is designed as a modular workflow so that individual components can 
 
 Hi-C identifies interacting chromatin regions, but the genomic bins used for Hi-C loop detection do not necessarily identify the exact nucleotide-level regulatory element responsible for the interaction.
 
-ChIP-SP integrates transcription factor ChIP-seq peaks with Hi-C loops to identify spatially linked regulatory regions.
+ChIPSP integrates transcription factor ChIP-seq peaks with Hi-C loops to identify spatially linked regulatory regions.
 
-For each Hi-C loop, ChIP-SP determines whether a ChIP-seq peak overlaps either loop anchor. When a ChIP-seq peak overlaps one anchor, the interacting partner anchor is assigned as a spatially linked regulatory region.
+For each Hi-C loop, ChIPSP determines whether a ChIP-seq peak overlaps either loop anchor. When a ChIP-seq peak overlaps one anchor, the interacting partner anchor is assigned as a spatially linked regulatory region.
 
 The full interacting Hi-C anchor interval is therefore treated as a potential spatial regulatory region associated with the ChIP-seq transcription factor.
 
@@ -31,7 +31,7 @@ Spatial interactions are ranked using information from both:
 - ChIP-seq peak strength (`pileup`)
 - Hi-C interaction confidence (`FDR`)
 
-The resulting ChIP-SP regions can subsequently be used for gene annotation, pathway enrichment, transcription factor enrichment, genome-browser visualization, and other downstream analyses.
+The resulting ChIPSP regions can subsequently be used for gene annotation, pathway enrichment, transcription factor enrichment, genome-browser visualization, and other downstream analyses.
 
 ---
 
@@ -84,7 +84,7 @@ ChIPSPenrichment()
 
 # Main Workflow
 
-A typical complete ChIP-SP analysis can be performed as follows:
+A typical complete ChIPSP analysis can be performed as follows:
 
 ```r
 library(ChIPSP)
@@ -108,7 +108,7 @@ hic_df <- mergeHiCLoops(
 
 
 # ------------------------------------------------------------
-# Step 3. Perform ChIP-SP spatial integration
+# Step 3. Perform ChIPSP spatial integration
 # ------------------------------------------------------------
 
 chipsp_results <- chipSPLink(
@@ -117,7 +117,7 @@ chipsp_results <- chipSPLink(
 
 
 # ------------------------------------------------------------
-# Step 4. Annotate conventional ChIP and ChIP-SP regions
+# Step 4. Annotate conventional ChIP and ChIPSP regions
 # ------------------------------------------------------------
 
 annotation_results <- ChIPSPannotation(
@@ -173,7 +173,7 @@ This step is optional. If sex-chromosome interactions are biologically relevant 
 
 `mergeHiCLoops()` combines Hi-C loop outputs from multiple files into a unified Hi-C loop table.
 
-This allows ChIP-SP to integrate loops obtained from:
+This allows ChIPSP to integrate loops obtained from:
 
 - multiple biological replicates
 - multiple Hi-C loop-calling resolutions
@@ -195,9 +195,9 @@ The resulting `hic_df` is a merged Hi-C loop data frame that can be passed direc
 
 ---
 
-# Step 3: ChIP-SP Spatial Integration
+# Step 3: ChIPSP Spatial Integration
 
-`chipSPLink()` performs the core ChIP-SP analysis.
+`chipSPLink()` performs the core ChIPSP analysis.
 
 The function identifies ChIP-seq peaks overlapping Hi-C loop anchors and projects the ChIP-seq regulatory signal to the corresponding interacting anchor.
 
@@ -241,7 +241,7 @@ The default output file is:
 ChIPSP_results.csv
 ```
 
-The ChIP-SP output contains genomic coordinates and ranking information including:
+The ChIPSP output contains genomic coordinates and ranking information including:
 
 ```text
 chr
@@ -256,15 +256,15 @@ score
 rank
 ```
 
-The ChIP-SP score integrates normalized ChIP-seq signal and normalized Hi-C interaction confidence.
+The ChIPSP score integrates normalized ChIP-seq signal and normalized Hi-C interaction confidence.
 
-Regions with stronger ChIP-seq signal and more confident Hi-C interactions receive higher ChIP-SP ranking scores.
+Regions with stronger ChIP-seq signal and more confident Hi-C interactions receive higher ChIPSP ranking scores.
 
 ---
 
 # Step 4: Gene Annotation
 
-`ChIPSPannotation()` annotates both conventional ChIP-seq peaks and ChIP-SP spatially linked regions to nearby genes.
+`ChIPSPannotation()` annotates both conventional ChIP-seq peaks and ChIPSP spatially linked regions to nearby genes.
 
 The function uses genome-specific gene annotation resources and supports both human and mouse genomes.
 
@@ -288,7 +288,7 @@ ChIP_anno_genes_upAdown_UCSC_CHIPSP.csv
 
 The first file contains annotations for conventional ChIP-seq peaks.
 
-The second file contains annotations for ChIP-SP spatially linked regions.
+The second file contains annotations for ChIPSP spatially linked regions.
 
 ---
 
@@ -493,13 +493,13 @@ contains genes associated with conventional ChIP-seq peaks,
 ChIPSP
 ```
 
-contains genes associated with ChIP-SP spatial regions,
+contains genes associated with ChIPSP spatial regions,
 
 ```text
 ChIPSP_only
 ```
 
-contains genes uniquely identified by ChIP-SP,
+contains genes uniquely identified by ChIPSP,
 
 ```text
 ChIP_only
@@ -567,7 +567,7 @@ enrich_results <- ChIPSPenrichment(
 )
 ```
 
-The current default database set was designed primarily for the human ChIP-SP workflow and includes:
+The current default database set was designed primarily for the human ChIPSP workflow and includes:
 
 ```text
 KEGG_2021_Human
@@ -675,9 +675,9 @@ annotation_results <- ChIPSPannotation(
 
 # Output Files
 
-A standard ChIP-SP analysis produces several classes of output.
+A standard ChIPSP analysis produces several classes of output.
 
-The core ChIP-SP spatial-integration output is:
+The core ChIPSP spatial-integration output is:
 
 ```text
 ChIPSP_results.csv
@@ -704,9 +704,9 @@ directory containing gene lists, pathway-enrichment tables, a combined enrichmen
 
 All input files can be placed in the same working directory, although complete file paths may also be supplied.
 
-Hi-C files should contain the genomic coordinates and FDR information required by the ChIP-SP workflow.
+Hi-C files should contain the genomic coordinates and FDR information required by the ChIPSP workflow.
 
-ChIP-seq input files should contain genomic coordinates and ChIP-seq signal information, including the `pileup` signal used for ChIP-SP ranking.
+ChIP-seq input files should contain genomic coordinates and ChIP-seq signal information, including the `pileup` signal used for ChIPSP ranking.
 
 Users should ensure that the ChIP-seq and Hi-C datasets use the same reference genome.
 
@@ -724,7 +724,7 @@ species = "mouse"
 ref_genome = "mm10"
 ```
 
-Genome builds should not be mixed within the same ChIP-SP analysis.
+Genome builds should not be mixed within the same ChIPSP analysis.
 
 ---
 
@@ -739,32 +739,32 @@ Hi-C loop merging
         ↓
 ChIP–Hi-C spatial integration
         ↓
-ChIP-SP ranking
+ChIPSP ranking
         ↓
 Gene annotation
         ↓
 Functional enrichment
 ```
 
-The core spatial-integration result remains independent of downstream interpretation. Users can therefore use the ChIP-SP output with alternative genome annotations, enrichment platforms, transcription factor databases, genome browsers, or visualization tools if desired.
+The core spatial-integration result remains independent of downstream interpretation. Users can therefore use the ChIPSP output with alternative genome annotations, enrichment platforms, transcription factor databases, genome browsers, or visualization tools if desired.
 
 ---
 
 # Notes
 
-ChIP-SP performance depends directly on the quality of the underlying ChIP-seq and Hi-C datasets.
+ChIPSP performance depends directly on the quality of the underlying ChIP-seq and Hi-C datasets.
 
 The ChIP-seq and Hi-C datasets should use compatible chromosome naming conventions and the same reference genome.
 
-Hi-C loop detection is resolution-dependent, and the number and genomic size of detected loop anchors can influence the number of spatial regulatory regions identified by ChIP-SP.
+Hi-C loop detection is resolution-dependent, and the number and genomic size of detected loop anchors can influence the number of spatial regulatory regions identified by ChIPSP.
 
-Users should therefore consider ChIP-seq quality, Hi-C sequencing depth, loop-calling resolution, and genome-build compatibility when interpreting ChIP-SP results.
+Users should therefore consider ChIP-seq quality, Hi-C sequencing depth, loop-calling resolution, and genome-build compatibility when interpreting ChIPSP results.
 
 ---
 
 # Citation
 
-If you use `ChIPSP` in your research, please cite the associated manuscript describing the ChIP-SP method.
+If you use `ChIPSP` in your research, please cite the associated manuscript describing the ChIPSP method.
 
 Citation details will be added once available.
 
