@@ -50,6 +50,8 @@ Install the current development version directly from the `main` branch of GitHu
 ```r
 install.packages("remotes")
 
+install.packages("data.table")
+
 remotes::install_github(
   "Lattesnow/ChIPSP@main",
   force = TRUE,
