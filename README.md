@@ -50,9 +50,9 @@ Install the current development version directly from the `main` branch of GitHu
 ```r
 install.packages("remotes")
 install.packages("BiocManager")
-BiocManager::install("dplyr")
-BiocManager::install(c("ChIPpeakAnno","GenomicRanges","Iranges","S4Vectors","AnnotationDbi","org.Hs.eg.db","TxDb.Hsapiens.UCSC.hg19.knownGene"))
 install.packages("data.table")
+BiocManager::install(c("dplyr","ChIPpeakAnno","GenomicRanges","Iranges","S4Vectors","AnnotationDbi","org.Hs.eg.db","TxDb.Hsapiens.UCSC.hg19.knownGene","enrichR"))
+
 
 remotes::install_github(
   "Lattesnow/ChIPSP@main",
