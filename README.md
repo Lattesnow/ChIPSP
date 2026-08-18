@@ -547,6 +547,8 @@ For the dotplots:
 - the x-axis represents gene ratio
 - gene ratio is calculated as overlapping genes divided by the total number of genes in the pathway
 
+Note: Annotation results may vary depending on the versions of the required annotation packages and genome databases used.
+
 The default output directory is:
 
 ```text
