@@ -49,7 +49,9 @@ Install the current development version directly from the `main` branch of GitHu
 
 ```r
 install.packages("remotes")
-
+install.packages("BiocManager")
+BiocManager::install("dplyr")
+BiocManager::install(c("ChIPpeakAnno","GenomicRanges","Iranges","S4Vectors","AnnotationDbi","org.HS.eg.db","TxDb.Hsapiens.UCSC.hg19.knownGene")
 install.packages("data.table")
 
 remotes::install_github(
